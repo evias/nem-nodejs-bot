@@ -101,12 +101,13 @@ var startBotServer = function(config)
 			var network    = getChainService(config).getNetwork();
 			var blockchain = network.isTest ? "Testnet Blockchain" : network.isMijin ? "Mijin Private Blockchain" : "NEM Mainnet Public Blockchain";
 			var botWallet  = getChainService(config).getBotWallet();
+			var hostname   = app.settings.env == 'development' ? "localhost" : this.address().address;
 
 			console.log("------------------------------------------------------------------------");
 			console.log("--                       NEM Bot by eVias                             --");
 			console.log("------------------------------------------------------------------------");
 			console.log("-");
-			console.log("- NEM Bot Server listening on Port %d in %s mode", this.address().port, app.settings.env);
+			console.log("- NEM Bot Server listening on Port %d with hostname %s in %s mode", this.address().port, hostname, app.settings.env);
 			console.log("- NEM Bot is using blockchain: " + blockchain);
 			console.log("- NEM Bot Wallet is: " + botWallet);
 			console.log("-")
