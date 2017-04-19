@@ -2,7 +2,8 @@
     "bot": {
         "mode": "read",
         "walletAddress": "TC72N5Y5WFA7KMI2VG3B7T67EQXGB4ATDXCTJGKE",
-        "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots"
+        "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots",
+        "protectedEndpoints": true
     },
     "nem": {
         "isTestMode": true,

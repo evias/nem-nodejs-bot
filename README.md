@@ -16,7 +16,7 @@ The bot can be configured to execute any, none or all of the following features:
 Only WRITE features need your Private Key, change the "mode" config to "read" or "write" or "both" to enable/disable read and write.
 This allows deploying read-only bots which don't need your Private Key and can be addressed through an easy HTTP API.
 
-For installation, first install the dependencies of this package. Using the terminal works as follows:
+For a local installation, first install the dependencies of this package. Using the terminal works as follows:
 ```
     $ cd /path/to/this/clone
     $ npm install
@@ -36,6 +36,23 @@ variables in the Settings tab of your app. Using Linux you can add environment v
 ```
 
 The config/bot.json file will only be removed in "production" mode.
+
+### Deploy on Heroku
+
+This NEM Bot is compatible with heroku free tiers. This means you can deploy the source code (AFTER MODIFICATION of config/bot.json)
+to your Heroku instance and the Bot will run on the heroku tier. Before you deploy to the Heroku app, you must configure following
+```Config Variables``` in your Heroku App (Settings) :
+```
+    - Required:
+        - ENCRYPT_PASS : Should contain the configuration file encryption password.
+        - PORT : Should contain the Port on which the Bot should be addressed.
+
+    - Optional :
+        - NEM_HOST : Mainnet default NEM node. (http://alice6.nem.ninja)
+        - NEM_PORT : Mainnet default NEM node port. (7890)
+        - NEM_HOST_TEST : Testnet default NEM node. (http://bob.nem.ninja)
+        - NEM_PORT_TEST : Testnet default NEM node port. (7890)
+```
 
 ### Pot de vin
 
