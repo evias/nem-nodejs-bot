@@ -1,0 +1,21 @@
+{
+    "bot": {
+        "mode": "read",
+        "walletAddress": "TC72N5Y5WFA7KMI2VG3B7T67EQXGB4ATDXCTJGKE",
+        "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots",
+        "protectedEndpoints": true
+    },
+    "nem": {
+        "isTestMode": true,
+        "isMijin": false,
+        "nodes": [
+            {"host": "http://alice6.nem.ninja", "port": 7890},
+            {"host": "http://alice7.nem.ninja", "port": 7890},
+            {"host": "http://san.nem.ninja", "port": 7890}
+        ],
+        "nodes_test": [
+            {"host": "http://bob.nem.ninja", "port": 7890},
+            {"host": "http://bigalice2.nem.ninja", "port": 7890}
+        ]
+    }
+}
