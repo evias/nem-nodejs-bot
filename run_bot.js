@@ -29,6 +29,7 @@ var app = require('express')(),
 var logger = require('./src/utils/logger.js');
 var __smartfilename = path.basename(__filename);
 
+// define a helper for development debug of requests
 var serverLog = function(req, msg, type)
 {
 	var logMsg = "[" + type + "] " + msg + " (" + (req.headers ? req.headers['x-forwarded-for'] : "?") + " - "
@@ -52,6 +53,27 @@ var getChainService = function(config)
 	return chainDataLayers[thisBot];
 };
 
+// define a helper to process configuration file encryption
+var encryptConfig = function(pass)
+{
+	var dec = fs.readFileSync("config/bot.json");
+	var enc = sconf.encryptContent(dec, pass);
+
+	if (enc === undefined) {
+		logger.error(__smartfilename, __line, "Configuration file config/bot.json could not be encrypted.");
+		logger.warn(__smartfilename, __line, "NEM Bot now aborting.");
+		return false;
+	}
+
+	fs.writeFileSync("config/bot.json.enc", enc);
+
+	if (app.settings.env == "production")
+		// don't delete in development mode
+		fs.unlink("config/bot.json");
+
+	return true;
+};
+
 /**
  * Delayed route configuration. This will only be triggered when
  * the configuration file can be decrypted.
@@ -60,7 +82,7 @@ var getChainService = function(config)
  * routes list will change according to the Bot's "mode" config
  * value.
  */
-var serveAPI = function(config)
+var initBotAPI = function(config)
 {
 	// configure body-parser usage for POST API calls.
 	app.use(bodyParser.urlencoded({ extended: true }));
@@ -75,6 +97,9 @@ var serveAPI = function(config)
 		app.use(auth.connect(basicAuth));
 	}
 
+	var package = fs.readFileSync("package.json");
+	var botPackage = JSON.parse(package);
+
 	/**
 	 * API Routes
 	 *
@@ -84,7 +109,13 @@ var serveAPI = function(config)
 	app.get("/api/v1/ping", function(req, res)
 		{
 			res.setHeader('Content-Type', 'application/json');
-			res.send(JSON.stringify({item: {pong: new Date().valueOf()}}));
+			res.send(JSON.stringify({time: new Date().valueOf()}));
+		});
+
+	app.get("/api/v1/version", function(req, res)
+		{
+			res.setHeader('Content-Type', 'application/json');
+			res.send(JSON.stringify({version: botPackage.version}));
 		});
 
 	//XXX read config and serve given API endpoints.
@@ -97,7 +128,7 @@ var serveAPI = function(config)
  * Following is where we Start the express Server and where the routes will
  * be registered.
  */
-var startBotServer = function(config)
+var initBotServer = function(config)
 {
 	/**
 	 * Now listen for connections on the Web Server.
@@ -124,26 +155,15 @@ var startBotServer = function(config)
 		});
 };
 
-var encryptConfig = function(pass)
-{
-	var dec = fs.readFileSync("config/bot.json");
-	var enc = sconf.encryptContent(dec, pass);
-
-	if (enc === undefined) {
-		logger.error(__smartfilename, __line, "Configuration file config/bot.json could not be encrypted.");
-		logger.warn(__smartfilename, __line, "NEM Bot now aborting.");
-		return false;
-	}
-
-	fs.writeFileSync("config/bot.json.enc", enc);
-
-	if (app.settings.env == "production")
-		// don't delete in development mode
-		fs.unlink("config/bot.json");
-
-	return true;
-};
-
+/**
+ * Delayed Bot execution. This function STARTS the bot and will only
+ * work in case the encrypted configuration file exists AND can be
+ * decrypted with the provided password (or asks password in console.)
+ *
+ * On heroku, as it is not possible to enter data in the console, the password
+ * must be set in the ENCRYPT_PASS "Config Variable" of your Heroku app which
+ * you can set under the "Settings" tab.
+ */
 var startBot = function(pass)
 {
 	if (fs.existsSync("config/bot.json.enc")) {
@@ -160,8 +180,8 @@ var startBot = function(pass)
 		else {
 			try {
 				var config = JSON.parse(dec);
-				serveAPI(config);
-				startBotServer(config);
+				initBotAPI(config);
+				initBotServer(config);
 			}
 			catch (e) {
 				logger.error(__smartfilename, __line, "Error with NEM Bot configuration: " + e);
