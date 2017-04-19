@@ -56,9 +56,16 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
 
 ### Private Deploy
 
-You can specify basic HTTP auth parameters in the nem-bot.htpasswd file. Default username is ```demo``` and default password
-is ```opendev```. To enable basic HTTP auth you must set the option "bot.protectedEndpoints" to ```true```, the Bot will then
+You can specify basic HTTP auth parameters in the **nem-bot.htpasswd** file. Default username is **demo** and default password
+is **opendev**. To enable basic HTTP auth you must set the option "bot.protectedEndpoints" to ```true```, the Bot will then
 read the nem-bot.htpasswd file.
+
+In case you will be using the protectedEndpoints option, make sure to update the **nem-bot.htpasswd** file with your new username/pw combination,
+and to disable the default login credentials, like so:
+```
+    $ htpasswd -D nem-bot.htpasswd demo
+    $ htpasswd nem-bot.htpasswd yourSecureUsername
+```
 
 ### Pot de vin
 
