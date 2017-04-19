@@ -29,6 +29,14 @@ After configuration, you can start the Bot, locally this would be:
     $ npm run_bot.js
 ```
 
+You can configure your Bot's configuration encryption password with the ENCRYPT_PASS environment variable. In heroku you can add env
+variables in the Settings tab of your app. Using Linux you can add environment variable at startup like the following:
+```
+    $ env ENCRYPT_PASS=notSecurePass node run_bot.js
+```
+
+The config/bot.json file will only be removed in "production" mode.
+
 ### Pot de vin
 
 If you like the initiative, and for the sake of good mood, I recommend you take a few minutes to Donate a beer or Three [because belgians like that] by sending some XEM (or whatever Mosaic you think pays me a few beers someday!) to my Wallet:

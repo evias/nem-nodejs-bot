@@ -44,7 +44,7 @@ var service = function(config)
     var node_   = nem_.model.objects.create("endpoint")(nemHost, nemPort);
 
     // following is our bot's XEM wallet address
-    var botWallet_  = (process.env["BOT_WALLET"] || conf_.bot.walletAddress.replace(/-/g, "");
+    var botWallet_  = (process.env["BOT_WALLET"] || conf_.bot.walletAddress).replace(/-/g, "");
 
     /**
      * Get this bot's Wallet Address

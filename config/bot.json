@@ -16,5 +16,5 @@
             {"host": "http://bob.nem.ninja", "port": 7890},
             {"host": "http://bigalice2.nem.ninja", "port": 7890}
         ]
-    },
+    }
 }

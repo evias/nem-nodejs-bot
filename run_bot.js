@@ -21,8 +21,9 @@ var app = require('express')(),
 	path = require('path'),
 	auth = require("http-auth"),
 	bodyParser = require("body-parser"),
-	config = require("secure-conf"),
-    fs = require("fs");
+	SecureConf = require("secure-conf"),
+    fs = require("fs"),
+    pw = require("pw");
 
 // core dependencies
 var logger = require('./src/utils/logger.js');
@@ -113,6 +114,53 @@ var startBotServer = function(config)
 		});
 };
 
+var encryptConfig = function(pass)
+{
+	var dec = fs.readFileSync("config/bot.json");
+	var enc = sconf.encryptContent(dec, pass);
+
+	if (enc === undefined) {
+		logger.error(__smartfilename, __line, "Configuration file config/bot.json could not be encrypted.");
+		logger.warn(__smartfilename, __line, "NEM Bot now aborting.");
+		return false;
+	}
+
+	fs.writeFileSync("config/bot.json.enc", enc);
+
+	if (app.settings.env == "production")
+		// don't delete in development mode
+		fs.unlink("config/bot.json");
+
+	return true;
+};
+
+var startBot = function(pass)
+{
+	if (fs.existsSync("config/bot.json.enc")) {
+		// Only start the bot in case the file is found
+		// and can be decrypted.
+
+		var enc = fs.readFileSync("config/bot.json.enc", {encoding: "utf8"});
+		var dec = sconf.decryptContent(enc, pass);
+
+		if (dec === undefined) {
+			logger.error(__smartfilename, __line, "Configuration file config/bot.json could not be decrypted.");
+			logger.warn(__smartfilename, __line, "NEM Bot now aborting.");
+		}
+		else {
+			try {
+				var config = JSON.parse(dec);
+				serveAPI(config);
+				startBotServer(config);
+			}
+			catch (e) {
+				logger.error(__smartfilename, __line, "Error with NEM Bot configuration: " + e);
+				logger.warn(__smartfilename, __line, "NEM Bot now aborting.");
+			}
+		}
+	}
+};
+
 /**
  * This Bot will only start serving its API when the configuration
  * file is encrypted and can be decrypted.
@@ -121,37 +169,35 @@ var startBotServer = function(config)
  * and the original file will be deleted.
  */
 var sconf = new SecureConf();
+var pass  = process.env["ENCRYPT_PASS"] || "";
 
-// check whether the encrypted file must be created.
-if (! fs.existsSync("config/bot.json.enc")) {
-	// need to encrypt content and delete the plaintext config
-	// before we can start the bot.
+if (typeof pass == 'undefined' || ! pass.length) {
+	// get enc-/dec-rypt password from console
 
-	sconf.encryptFile(
-		"config/bot.json",
-		"config/bot.json.enc",
-		process.env["ENCRYPT_PASS"],
-		function(err, file, encF, encC)
-			{
-				if (err) {
-					// WILL NOT SERVE THE BOT
-					logger.error(__smartfilename, __line, "Could not decrypt configuration file config/bot.json.enc");
-					logger.warn(__smartfilename, __line, "NEM Bot aborted!");
-					return false;
-				}
+	if (! fs.existsSync("config/bot.json.enc")) {
+		// encrypted configuration file not yet created
 
-				if (app.settings.env == "production")
-					fs.unlink("config/bot.json");
-			});
+		console.log("Please enter a password for Encryption: ");
+		pw(function(password) {
+			encryptConfig(password);
+			startBot(password);
+		});
+	}
+	else {
+		// encrypted file exists, ask password for decryption
+
+		console.log("Please enter your password: ");
+		pw(function(password) {
+			startBot(password);
+		});
+	}
 }
+else {
+	// use environment variable password
 
-// now decrypt content if possible and run the bot.
-sconf.decryptFile(
-	"config/bot.json.enc",
-	process.env["ENCRYPT_PASS"],
-	function(err, file, content)
-	{
-		var config = JSON.parse(content);
-		serveAPI(config);
-		startBotServer(config);
-	});
+	if (! fs.existsSync("config/bot.json.enc"))
+		// encrypted file must be created
+		encryptConfig(pass);
+
+	startBot(pass);
+}
