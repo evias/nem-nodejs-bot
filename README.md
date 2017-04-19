@@ -54,6 +54,12 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
         - NEM_PORT_TEST : Testnet default NEM node port. (7890)
 ```
 
+### Private Deploy
+
+You can specify basic HTTP auth parameters in the nem-bot.htpasswd file. Default username is ```demo``` and default password
+is ```opendev```. To enable basic HTTP auth you must set the option "bot.protectedEndpoints" to ```true```, the Bot will then
+read the nem-bot.htpasswd file.
+
 ### Pot de vin
 
 If you like the initiative, and for the sake of good mood, I recommend you take a few minutes to Donate a beer or Three [because belgians like that] by sending some XEM (or whatever Mosaic you think pays me a few beers someday!) to my Wallet:
