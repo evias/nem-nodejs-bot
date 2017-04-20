@@ -145,6 +145,8 @@ var NEMBot = function(config, logger, chainDataLayer)
             logger.info("src/server.js", __line, '[' + socket.id + '] nembot()');
             backends_connected_[socket.id] = socket;
 
+            // When a payment channel is opened, we must initialize the nem websockets
+            // listening to our Bot's accounts channels (/unconfirmed and /transactions for now)
             socket.on('nembot_open_payment_channel', function (channelOpts) {
                 logger.info("src/server.js", __line, '[' + socket.id + '] open_channel(' + channelOpts + ')');
 
