@@ -3,6 +3,39 @@
 This is a multi feature Bot written in Node.js for the NEM blockchain. This bot can be deployed to Heroku free tiers
 or serving locally.
 
+Main features of this bot include listening to account transactions income or account data modifications and cosigning
+multi signature accounts transactions.
+
+Socket.io is used to Proxy the Communication between the NEMBot and your Node.js express app. To avoid addressing your
+NEMBot over HTTP directly (traceable in the Network Console), I implemented a Proxying mechanism using Socket.io. An
+example will be added to demonstrate how your Node.js app can be plugged to the NEMBot Websocket easily without having
+to disclose the NEMBot instance Hostname or IP address.
+
+As of now, here is a list of implemented Socket.io events which your Node.js BACKEND can plug to:
+```
+    - nembot_open_payment_channel (
+        {
+            number: "MYINVOICE-1",
+            payer: "NB72EM6TTSX72O47T3GQFL345AB5WYKIDODKPPYW"
+        });
+
+    - nembot_payment_status_update (
+        {
+            invoice: "MYINVOICE-1",
+            status: "unconfirmed"
+        });
+
+    - nembot_disconnect ()
+```
+
+More details on the Socket.io proxying method will follow soon.
+
+### Dependencies
+
+This package uses the ```nem-sdk``` package and the ```nem-api``` package as a showcase for both libraries. ```nem-sdk```
+can be used to perform any kind of HTTP request to the blockchain API, while ```nem-api``` supports both HTTP requests
+and Websockets (which we will use).
+
 ### Installation
 
 The secure-conf plugin is used to encrypt the config/bot.json file. This file is where you should configure this bot.

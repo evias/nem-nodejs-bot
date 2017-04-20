@@ -21,13 +21,24 @@ var app = require('express')(),
     server = require('http').createServer(app),
     auth = require("http-auth"),
     bodyParser = require("body-parser"),
-    fs = require("fs");
+    fs = require("fs"),
+    io = require('socket.io').listen(server);
 
-var NEMBot = function(config, chainDataLayer)
+var NEMBot = function(config, logger, chainDataLayer)
 {
     this.config_      = config;
     this.blockchain_  = chainDataLayer;
     this.environment_ = process.env["APP_ENV"] || "development";
+
+    // define a helper for development debug of requests
+    this.serverLog = function(req, msg, type)
+    {
+        var logMsg = "[" + type + "] " + msg + " (" + (req.headers ? req.headers['x-forwarded-for'] : "?") + " - "
+                   + (req.connection ? req.connection.remoteAddress : "?") + " - "
+                   + (req.socket ? req.socket.remoteAddress : "?") + " - "
+                   + (req.connection && req.connection.socket ? req.connection.socket.remoteAddress : "?") + ")";
+        logger.info("src/server.js", __line, logMsg);
+    };
 
     /**
      * Delayed route configuration. This will only be triggered when
@@ -112,10 +123,50 @@ var NEMBot = function(config, chainDataLayer)
             });
     };
 
+    /**
+     * This will initialize listening on socket.io websocket
+     * channels. This method is used to Protected the Bot and not
+     * disclose the bot identity (or url, IP,..) while using it
+     * from a Node.js app.
+     *
+     * Your Node.js app's BACKEND should subscribe to this websocket
+     * stream, NOT YOUR FRONTEND!
+     *
+     * @param  {[type]} config [description]
+     * @return {[type]}        [description]
+     */
+    this.initSocketProxy = function(config)
+    {
+        var self = this;
+
+        var backends_connected_ = {};
+        io.sockets.on('connection', function(socket)
+        {
+            var __smartfile
+            logger.info("src/server.js", __line, '[' + socket.id + '] ()');
+            backends_connected_[socket.id] = socket;
+
+            socket.on('nembot_open_payment_channel', function (channelOpts) {
+                logger.info("src/server.js", __line, '[' + socket.id + '] open_channel(' + JSON.stringify(channelOpts) + ')');
+
+                // configure blockchain service WebSockets
+                self.blockchain_.initSocketListeners(socket, channelOpts);
+            });
+
+            socket.on('nembot_disconnect', function () {
+                logger.info("src/server.js", __line, '[' + socket.id + '] ~()');
+
+                if (backends_connected_.hasOwnProperty(socket.id))
+                    delete backends_connected_[socket.id];
+            });
+        });
+    };
+
     var self = this;
     {
         // new instances automatically init the server and endpoints
         self.initBotAPI(self.config_);
+        self.initSocketProxy(self.config_);
         self.initBotServer(self.config_);
     }
 };

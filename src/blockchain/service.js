@@ -17,7 +17,8 @@
 
 (function() {
 
-var nemSDK = require("nem-sdk").default;
+var nemSDK = require("nem-sdk").default,
+    nemAPI = require("nem-api");
 
 /**
  * class service provide a business layer for
@@ -25,14 +26,16 @@ var nemSDK = require("nem-sdk").default;
  *
  * @author  Grégory Saive <greg@evias.be> (https://github.com/evias)
  */
-var service = function(config)
+var service = function(config, logger)
 {
     // initialize the current running bot's blockchain service with
     // the NEM blockchain. This will create the endpoint for the given
     // network and port (testnet, mainnet, mijin) and will then initialize
     // a common object using the configured private key.
     var nem_  = nemSDK;
+    var api_  = nemAPI;
     var conf_ = config;
+    var logger_ = logger;
 
     var isTestMode = config.nem.isTestMode;
     var envSuffix  = isTestMode ? "_TEST" : "";
@@ -44,7 +47,21 @@ var service = function(config)
     var node_   = nem_.model.objects.create("endpoint")(nemHost, nemPort);
 
     // following is our bot's XEM wallet address
-    var botWallet_  = (process.env["BOT_WALLET"] || conf_.bot.walletAddress).replace(/-/g, "");
+    var botWallet_ = (process.env["BOT_WALLET"] || conf_.bot.walletAddress).replace(/-/g, "");
+
+    // define a helper for development debug of websocket
+    this.socketLog = function(msg, type)
+    {
+        var logMsg = "[" + type + "] " + msg;
+        logger_.info("src/blockchain/service.js", __line, logMsg);
+    };
+
+    // define a helper for ERROR of websocket
+    this.socketError = function(msg, type)
+    {
+        var logMsg = "[" + type + "] " + msg;
+        logger_.error("src/blockchain/service.js", __line, logMsg);
+    };
 
     /**
      * Get this bot's Wallet Address
@@ -77,15 +94,100 @@ var service = function(config)
         };
     };
 
-    /**
-     * Get the status of the currently select NEM blockchain node.
-     *
-     * @return Promise
-     */
-    this.heartbeat = function()
+    this.initSocketListeners = function(backendSocket, options)
     {
-        return nem_.com.requests.endpoint.heartbeat(node_);
+        var self = this;
+
+        var backend_   = backendSocket;
+        var websocket_ = new api_(nemHost + ":" + nemPort);
+        var options_   = options;
+        var invoiceNumber_ = options.number;
+        var invoicePayer_  = options.payer;
+        var invoiceRecipient_ = options.recipient;
+
+        // define helper for websocket error handling
+        var websocketErrorHandler = function(error)
+        {
+            var regexp_LostConn = new RegExp(/Lost connection to/);
+            if (regexp_LostConn.test(error)) {
+                // need to reconnect
+                self.socketLog("Connection lost, re-connecting..", "DROP");
+                self.initSocketListeners(backend_, options_);
+                return false;
+            }
+
+            // uncaught error happened
+            self.socketError("Websocket Uncaught Error: " + error, "UNCAUGHT");
+        };
+
+        websocket_.connectWS(function()
+            {
+                // on connection we subscribe to the needed NEM blockchain websocket channels.
+
+                websocket_.subscribeWS("/errors", function(message) {
+                    self.socketError(message.body, "ERROR");
+                });
+
+                websocket_.subscribeWS("/unconfirmed/" + self.getBotWallet(), function(message) {
+                    self.socketLog(message.body, "TRX-UNCONFIRMED");
+
+                    var transactionData = JSON.parse(message.body);
+                    var transaction     = transactionData.transaction;
+
+                    if (! transaction)
+                        return false; //XXX error log
+
+                    if (transaction.recipient != self.getBotWallet())
+                        return false; // outgoing transaction not needed yet.
+
+                    if (transaction.message && transaction.message.type === 1) {
+                        // message available, check if it contains the `invoiceNumber`
+                        var payload = transaction.message.payload;
+                        var plain   = nem_.utils.convert.hex2a(payload);
+
+                        self.socketLog("With plain message: '" + plain + "'", "TRX-MSG");
+
+                        if (plain === invoiceNumber_) {
+                            backend_.emit("nembot_payment_status_update", JSON.stringify({invoice: invoiceNumber_, status: "unconfirmed"}));
+                        }
+                    }
+                    //XXX else try to check the signer Public Key to identify the Sender instead of message
+                });
+
+                websocket_.subscribeWS("/transactions/" + self.getBotWallet(), function(message) {
+                    self.socketLog(message.body, "TRX-CONFIRMED");
+
+                    var transactionData = JSON.parse(message.body);
+                    var transaction     = transactionData.transaction;
+
+                    if (! transaction)
+                        return false; //XXX error log
+
+                    if (transaction.recipient != self.getBotWallet())
+                        return false; // outgoing transaction not needed yet.
+
+                    if (transaction.message && transaction.message.type === 1) {
+                        // message available, check if it contains the `invoiceNumber`
+                        var payload = transaction.message.payload;
+                        var plain   = nem_.utils.convert.hex2a(payload);
+
+                        self.socketLog("With plain message: '" + plain + "'", "TRX-MSG");
+
+                        if (plain === invoiceNumber_) {
+                            backend_.emit("nembot_payment_status_update", JSON.stringify({invoice: invoiceNumber_, status: "done"}));
+                            backend_.emit("nembot_disconnect"); //XXX not needed in received status but in confirmed!
+                        }
+                    }
+                    //XXX else try to check the signer Public Key to identify the Sender instead of message
+                });
+
+            }, websocketErrorHandler);
     };
+
+    var self = this;
+    {
+        // nothing more done on instanciation
+    }
 };
 
 

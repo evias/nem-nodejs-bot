@@ -27,16 +27,6 @@ var environment = process.env["APP_ENV"] || "development";
 var logger = require('./src/utils/logger.js');
 var __smartfilename = path.basename(__filename);
 
-// define a helper for development debug of requests
-var serverLog = function(req, msg, type)
-{
-	var logMsg = "[" + type + "] " + msg + " (" + (req.headers ? req.headers['x-forwarded-for'] : "?") + " - "
-			   + (req.connection ? req.connection.remoteAddress : "?") + " - "
-			   + (req.socket ? req.socket.remoteAddress : "?") + " - "
-			   + (req.connection && req.connection.socket ? req.connection.socket.remoteAddress : "?") + ")";
-	logger.info(__smartfilename, __line, logMsg);
-};
-
 // define a helper to process configuration file encryption
 var sconf = new SecureConf();
 var encryptConfig = function(pass)
@@ -90,9 +80,9 @@ var startBot = function(pass)
 
 					// define a helper to get the blockchain service
 					var blockchain = require('./src/blockchain/service.js');
-					var chainDataLayer = new blockchain.service(config);
+					var chainDataLayer = new blockchain.service(config, logger);
 
-					var bot = new server.NEMBot(config, chainDataLayer);
+					var bot = new server.NEMBot(config, logger, chainDataLayer);
 				}
 				catch (e) {
 					logger.error(__smartfilename, __line, "Error with NEM Bot Server: " + e);
