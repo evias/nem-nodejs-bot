@@ -111,6 +111,7 @@ This can be understood as follows:
 
 So lets define the details about this scenario. BACKEND will use socket.io to send events
 to FRONTEND and then the BACKEND also uses socket.io to communicate with our NEMBot.
+
 ```
 // BACKEND:
 // This comes in your Node.js backend (usually app.js)
@@ -140,10 +141,11 @@ var startPaymentChannel = function(clientSocketId, callback)
         // => your BACKEND will be notified by your bot, not your FRONTEND!
         var invoiceSocket = client.connect("ws://localhost:29081");
 
-        // open a new payment channel
+        // open a new payment channel. The "message" option should contain your invoices
+        // UNIQUE message.
         var channelParams = {
-            number: "MY-INVOICE-123",
-            payer: "",
+            message: "MY-INVOICE-123",
+            payer: "TATKHV5JJTQXCUCXPXH2WPHLAYE73REUMGDOZKUW",
             recipient: "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU"
         };
         invoiceSocket.emit("nembot_open_payment_channel", JSON.stringify(channelParams));
@@ -156,7 +158,7 @@ var startPaymentChannel = function(clientSocketId, callback)
 
                 // forward to client.. "clientSocketId" is important here.
                 io.sockets.to(clientSocketId)
-                  .emit("pacnem_payment_status_update", JSON.stringify({"status": data.status, "realData": rawdata}));
+                  .emit("myapp_payment_status_update", JSON.stringify({"status": data.status, "realData": rawdata}));
             });
 
         callback(invoiceSocket);
@@ -183,7 +185,8 @@ expressApp.get("/create-invoice", function(req, res)
 ```
 // FRONTEND:
 // this comes in your jQuery (or any other) Frontend HTML Templates
-// ----------------------------------------------------
+// ----------------------------------------------------------------
+
 <script src="/socket.io/socket.io.js"></script>
 <script type="text/javascript">
     var socket = io.connect(window.location.protocol + '//' + window.location.host);
@@ -196,13 +199,16 @@ expressApp.get("/create-invoice", function(req, res)
 </script>
 ```
 
-### Pot de vin
+Pot de vin
+==========
 
 If you like the initiative, and for the sake of good mood, I recommend you take a few minutes to Donate a beer or Three [because belgians like that] by sending some XEM (or whatever Mosaic you think pays me a few beers someday!) to my Wallet:
+```
+    NB72EM6TTSX72O47T3GQFL345AB5WYKIDODKPPYW
+```
 
-NB72EM6TTSX72O47T3GQFL345AB5WYKIDODKPPYW
-
-### License
+License
+=======
 
 This software is released under the [MIT](LICENSE) License.
 

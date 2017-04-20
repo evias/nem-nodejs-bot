@@ -101,7 +101,7 @@ var service = function(config, logger)
         var backend_   = backendSocket;
         var websocket_ = new api_(nemHost + ":" + nemPort);
         var options_   = options;
-        var invoiceNumber_ = options.number;
+        var invoiceNumber_ = options.message;
         var invoicePayer_  = options.payer;
         var invoiceRecipient_ = options.recipient;
 
