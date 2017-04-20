@@ -142,19 +142,20 @@ var NEMBot = function(config, logger, chainDataLayer)
         var backends_connected_ = {};
         io.sockets.on('connection', function(socket)
         {
-            var __smartfile
-            logger.info("src/server.js", __line, '[' + socket.id + '] ()');
+            logger.info("src/server.js", __line, '[' + socket.id + '] nembot()');
             backends_connected_[socket.id] = socket;
 
             socket.on('nembot_open_payment_channel', function (channelOpts) {
-                logger.info("src/server.js", __line, '[' + socket.id + '] open_channel(' + JSON.stringify(channelOpts) + ')');
+                logger.info("src/server.js", __line, '[' + socket.id + '] open_channel(' + channelOpts + ')');
+
+                var options = JSON.parse(channelOpts);
 
                 // configure blockchain service WebSockets
-                self.blockchain_.initSocketListeners(socket, channelOpts);
+                self.blockchain_.initSocketListeners(socket, options);
             });
 
             socket.on('nembot_disconnect', function () {
-                logger.info("src/server.js", __line, '[' + socket.id + '] ~()');
+                logger.info("src/server.js", __line, '[' + socket.id + '] ~nembot()');
 
                 if (backends_connected_.hasOwnProperty(socket.id))
                     delete backends_connected_[socket.id];

@@ -129,7 +129,6 @@ var service = function(config, logger)
                 });
 
                 websocket_.subscribeWS("/unconfirmed/" + self.getBotWallet(), function(message) {
-                    self.socketLog(message.body, "TRX-UNCONFIRMED");
 
                     var transactionData = JSON.parse(message.body);
                     var transaction     = transactionData.transaction;
@@ -140,14 +139,17 @@ var service = function(config, logger)
                     if (transaction.recipient != self.getBotWallet())
                         return false; // outgoing transaction not needed yet.
 
+                    //XXX check amount
+
                     if (transaction.message && transaction.message.type === 1) {
                         // message available, check if it contains the `invoiceNumber`
                         var payload = transaction.message.payload;
                         var plain   = nem_.utils.convert.hex2a(payload);
 
-                        self.socketLog("With plain message: '" + plain + "'", "TRX-MSG");
+                        if (plain == invoiceNumber_) {
+                            self.socketLog("nembot_payment_status_update({'" + invoiceNumber_ + "', 'unconfirmed'})", backend_.id);
 
-                        if (plain === invoiceNumber_) {
+                            // payment received, not included in block!
                             backend_.emit("nembot_payment_status_update", JSON.stringify({invoice: invoiceNumber_, status: "unconfirmed"}));
                         }
                     }
@@ -155,8 +157,6 @@ var service = function(config, logger)
                 });
 
                 websocket_.subscribeWS("/transactions/" + self.getBotWallet(), function(message) {
-                    self.socketLog(message.body, "TRX-CONFIRMED");
-
                     var transactionData = JSON.parse(message.body);
                     var transaction     = transactionData.transaction;
 
@@ -166,16 +166,19 @@ var service = function(config, logger)
                     if (transaction.recipient != self.getBotWallet())
                         return false; // outgoing transaction not needed yet.
 
+                    //XXX check amount
+
                     if (transaction.message && transaction.message.type === 1) {
                         // message available, check if it contains the `invoiceNumber`
                         var payload = transaction.message.payload;
                         var plain   = nem_.utils.convert.hex2a(payload);
 
-                        self.socketLog("With plain message: '" + plain + "'", "TRX-MSG");
+                        if (plain == invoiceNumber_) {
+                            self.socketLog("nembot_payment_status_update({'" + invoiceNumber_ + "', 'done'})", backend_.id);
 
-                        if (plain === invoiceNumber_) {
+                            // payment done, update status and can close the channel
                             backend_.emit("nembot_payment_status_update", JSON.stringify({invoice: invoiceNumber_, status: "done"}));
-                            backend_.emit("nembot_disconnect"); //XXX not needed in received status but in confirmed!
+                            backend_.emit("nembot_disconnect");
                         }
                     }
                     //XXX else try to check the signer Public Key to identify the Sender instead of message
