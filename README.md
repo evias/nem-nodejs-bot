@@ -1,5 +1,5 @@
 nem-nodejs-bot: Node.js Bot for the NEM blockchain
---------------------------------------------------
+==================================================
 
 This is a multi feature Bot written in Node.js for the NEM blockchain. This bot can be deployed to Heroku free tiers
 or serving locally.
@@ -17,20 +17,21 @@ possible with the Multi Signature Account Push Notification System right in the 
 The NEMBot also provides a HTTP/JSON API for which the endpoints will be listed in this document.
 
 Dependencies
-============
+------------
 
 This package uses the ```nem-sdk``` package and the ```nem-api``` package as a showcase for both libraries. ```nem-sdk```
 can be used to perform any kind of HTTP request to the blockchain API, while ```nem-api``` supports both HTTP requests
 and Websockets (which we will use).
 
 Installation
-============
+------------
 
 The bot can be configured to execute any of the following features:
  - Payment Channel Listening (Read permission)
  - Balance Modifications Listening (Read permission)
  - Cosignatory Auditing (Read permission)
  - Multi Signature Transaction Co-Signing (Write permission)
+ - Tip Bots (HTTP/JSON API)
 
 Only WRITE features need your Private Key, change the "mode" config to "read" or "write" or "both" to enable/disable read and write.
 This allows deploying read-only bots which don't need your Private Key and can be addressed through an easy HTTP API and Websockets.
@@ -50,19 +51,11 @@ After configuration, you can start the Bot, locally this would be:
 
 Your bot is now running on localhost! The API is published on port 29081 by default.
 
-You can configure your Bot's configuration file encryption password with the ENCRYPT_PASS environment variable. In heroku you can add env
-variables in the Settings tab of your app.
-
-Using Linux you can add environment variable at startup like the following:
-```
-    $ env ENCRYPT_PASS=notSecurePass node run_bot.js
-```
-
-The config/bot.json file will only be removed in "production" mode. The environment is defined by the APP_ENV environment variables and
+The config/bot.json file will only be removed in "production" mode. The environment is defined by the **APP_ENV** environment variables and
 default to **development**.
 
 Deploy on Heroku
-================
+----------------
 
 This NEM Bot is compatible with heroku free tiers. This means you can deploy the source code (AFTER MODIFICATION of config/bot.json)
 to your Heroku instance and the Bot will run on the heroku tier. Before you deploy to the Heroku app, you must configure following
@@ -71,7 +64,7 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
     - Required:
         - APP_ENV : Environment of your NEMBot. Can be either production or development.
         - ENCRYPT_PASS : Should contain the configuration file encryption password.
-        - PORT : Should contain the Port on which the Bot HTTP/JSON API & Websockets should be addressed.
+        - PORT : Should contain the Port on which the Bot HTTP/JSON API & Websockets will be addressed.
 
     - Optional :
         - NEM_HOST : Mainnet default NEM node. (http://alice6.nem.ninja)
@@ -81,13 +74,13 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
 ```
 
 HTTP Basic Authentication
-=========================
+-------------------------
 
 You can specify basic HTTP auth parameters in the **nem-bot.htpasswd** file. Default username is **demo** and default password
-is **opendev**. To enable basic HTTP auth you must set the option "bot.protectedEndpoints" to ```true```, the Bot will then
-read the nem-bot.htpasswd file for HTTP/JSON API endpoints.
+is **opendev**. To enable basic HTTP auth you must set the option "bot.protectedAPI" to ```true```, the Bot will then
+read the nem-bot.htpasswd file for HTTP/JSON API endpoints. Of course **you should not commit when you update the .htpasswd file.**
 
-In case you plan to use the protectedEndpoints option, make sure to update the **nem-bot.htpasswd** file with your new username/password combination,
+In case you plan to use the protectedAPI option, make sure to update the **nem-bot.htpasswd** file with your new username/password combination,
 and also to disable the default login credentials, like so:
 ```
     $ htpasswd -D nem-bot.htpasswd demo
@@ -95,7 +88,7 @@ and also to disable the default login credentials, like so:
 ```
 
 Usage Examples
-==============
+--------------
 
 This example implements following Flow:
     - FRONTEND creates an invoice for someone to pay something
@@ -109,13 +102,13 @@ This can be understood as follows:
     jQuery > Node.js > NEMBot > NEM Blockchain > NEMBot > Node.js > jQuery
 ```
 
-So lets define the details about this scenario. BACKEND will use socket.io to send events
-to FRONTEND and then the BACKEND also uses socket.io to communicate with our NEMBot.
+So lets define the details about this scenario. Your BACKEND will use socket.io to send events
+to your FRONTEND and then the BACKEND also uses socket.io to communicate with the NEMBot.
 
 ```
 // BACKEND:
 // This comes in your Node.js backend (usually app.js)
-// and will configure the BACKEND to FRONTEND
+// and will configure the BACKEND to FRONTEND Websocket communication
 // ----------------------------------------------------
 
 var io = require("socket.io").listen(expressServer);
@@ -145,7 +138,7 @@ var startPaymentChannel = function(clientSocketId, callback)
         // UNIQUE message.
         var channelParams = {
             message: "MY-INVOICE-123",
-            payer: "TATKHV5JJTQXCUCXPXH2WPHLAYE73REUMGDOZKUW",
+            sender: "TATKHV5JJTQXCUCXPXH2WPHLAYE73REUMGDOZKUW",
             recipient: "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU"
         };
         invoiceSocket.emit("nembot_open_payment_channel", JSON.stringify(channelParams));
@@ -185,22 +178,26 @@ expressApp.get("/create-invoice", function(req, res)
 ```
 // FRONTEND:
 // this comes in your jQuery (or any other) Frontend HTML Templates
+// and will print to the console everytime a payment status update
+// is received from your backend. The Frontend nevers communicates
+// with the NEMBot directly.
 // ----------------------------------------------------------------
 
 <script src="/socket.io/socket.io.js"></script>
 <script type="text/javascript">
-    var socket = io.connect(window.location.protocol + '//' + window.location.host);
+    // connect to our BACKEND using socket.io
+    var frontendSocket = io.connect(window.location.protocol + '//' + window.location.host);
 
-    socket_.on("myapp_payment_status_update", function(rawdata)
+    frontendSocket.on("myapp_payment_status_update", function(rawdata)
     {
-        // this will display in the Javascript Console of your Browser!
+        // this will display in the Javascript Console of your Browser! (only for this frontendSocket!)
         console.log("received myapp_payment_status_update with: " + rawdata);
     });
 </script>
 ```
 
 Pot de vin
-==========
+----------
 
 If you like the initiative, and for the sake of good mood, I recommend you take a few minutes to Donate a beer or Three [because belgians like that] by sending some XEM (or whatever Mosaic you think pays me a few beers someday!) to my Wallet:
 ```
@@ -208,7 +205,7 @@ If you like the initiative, and for the sake of good mood, I recommend you take 
 ```
 
 License
-=======
+-------
 
 This software is released under the [MIT](LICENSE) License.
 

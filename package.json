@@ -17,6 +17,7 @@
         "secure-conf": "~0.0.4",
         "pw": "~0.0.4",
         "socket.io": "~1.3.5",
+        "node-json-db": "~0.7.3",
 
         "nem-sdk": "https://github.com/evias/NEM-sdk.git",
         "nem-api": "~1.4.5"

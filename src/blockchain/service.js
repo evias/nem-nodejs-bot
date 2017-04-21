@@ -18,7 +18,8 @@
 (function() {
 
 var nemSDK = require("nem-sdk").default,
-    nemAPI = require("nem-api");
+    nemAPI = require("nem-api"),
+    PaymentChannel = require("./payment-channel.js").PaymentChannel;
 
 /**
  * class service provide a business layer for
@@ -63,6 +64,16 @@ var service = function(config, logger)
         logger_.error("src/blockchain/service.js", __line, logMsg);
     };
 
+    this.nem = function()
+    {
+        return nem_;
+    };
+
+    this.logger = function()
+    {
+        return logger_;
+    };
+
     /**
      * Get this bot's Wallet Address
      *
@@ -94,16 +105,19 @@ var service = function(config, logger)
         };
     };
 
-    this.initSocketListeners = function(backendSocket, options)
+    this.openPaymentChannel = function(backendSocket, options, channelData)
     {
         var self = this;
 
         var backend_   = backendSocket;
         var websocket_ = new api_(nemHost + ":" + nemPort);
-        var options_   = options;
-        var invoiceNumber_ = options.message;
-        var invoicePayer_  = options.payer;
-        var invoiceRecipient_ = options.recipient;
+        var options_   = channelData || options;
+        var invoiceNumber_ = channelData.message || options.message || "";
+        var invoiceSender_  = channelData.sender ||  options.sender;
+        var invoiceRecipient_ = channelData.recipient || options.recipient || self.getBotWallet();
+
+        // open new payment channel
+        var paymentChannel = new PaymentChannel(self, backendSocket, channelData);
 
         // define helper for websocket error handling
         var websocketErrorHandler = function(error)
@@ -112,7 +126,7 @@ var service = function(config, logger)
             if (regexp_LostConn.test(error)) {
                 // need to reconnect
                 self.socketLog("Connection lost, re-connecting..", "DROP");
-                self.initSocketListeners(backend_, options_);
+                self.openPaymentChannel(backend_, options_, channelData);
                 return false;
             }
 
@@ -133,58 +147,36 @@ var service = function(config, logger)
                     var transactionData = JSON.parse(message.body);
                     var transaction     = transactionData.transaction;
 
-                    if (! transaction)
-                        return false; //XXX error log
+                    if (! transaction || transaction.recipient != self.getBotWallet())
+                        return false;
 
-                    if (transaction.recipient != self.getBotWallet())
-                        return false; // outgoing transaction not needed yet.
+                    var paymentData = {};
+                    if (false === (paymentData = paymentChannel.extractPaymentData(transaction, "amountUnconfirmed")))
+                        return false;
 
-                    //XXX check amount
-
-                    if (transaction.message && transaction.message.type === 1) {
-                        // message available, check if it contains the `invoiceNumber`
-                        var payload = transaction.message.payload;
-                        var plain   = nem_.utils.convert.hex2a(payload);
-
-                        if (plain == invoiceNumber_) {
-                            self.socketLog("nembot_payment_status_update({'" + invoiceNumber_ + "', 'unconfirmed'})", backend_.id);
-
-                            // payment received, not included in block!
-                            backend_.emit("nembot_payment_status_update", JSON.stringify({invoice: invoiceNumber_, status: "unconfirmed"}));
-                        }
-                    }
-                    //XXX else try to check the signer Public Key to identify the Sender instead of message
+                    paymentChannel.sendPaymentStatusUpdate(paymentData, "unconfirmed");
                 });
 
                 websocket_.subscribeWS("/transactions/" + self.getBotWallet(), function(message) {
                     var transactionData = JSON.parse(message.body);
                     var transaction     = transactionData.transaction;
 
-                    if (! transaction)
-                        return false; //XXX error log
+                    if (! transaction || transaction.recipient != self.getBotWallet())
+                        return false;
 
-                    if (transaction.recipient != self.getBotWallet())
-                        return false; // outgoing transaction not needed yet.
+                    var paymentData = {};
+                    if (false === (paymentData = paymentChannel.extractPaymentData(transaction, "amountPaid")))
+                        return false;
 
-                    //XXX check amount
+                    paymentChannel.sendPaymentStatusUpdate(paymentData, "confirmed");
 
-                    if (transaction.message && transaction.message.type === 1) {
-                        // message available, check if it contains the `invoiceNumber`
-                        var payload = transaction.message.payload;
-                        var plain   = nem_.utils.convert.hex2a(payload);
-
-                        if (plain == invoiceNumber_) {
-                            self.socketLog("nembot_payment_status_update({'" + invoiceNumber_ + "', 'done'})", backend_.id);
-
-                            // payment done, update status and can close the channel
-                            backend_.emit("nembot_payment_status_update", JSON.stringify({invoice: invoiceNumber_, status: "done"}));
-                            backend_.emit("nembot_disconnect");
-                        }
-                    }
-                    //XXX else try to check the signer Public Key to identify the Sender instead of message
+                    if (paymentChannel.isPaid())
+                        paymentChannel.finish();
                 });
 
             }, websocketErrorHandler);
+
+        return paymentChannel;
     };
 
     var self = this;
