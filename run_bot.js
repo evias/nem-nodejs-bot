@@ -16,44 +16,19 @@
  * @link       http://github.com/evias/nem-nodejs-bot
  */
 
-var app = require('express')(),
-	server = require('http').createServer(app),
-	path = require('path'),
-	auth = require("http-auth"),
-	bodyParser = require("body-parser"),
+var path = require('path'),
 	SecureConf = require("secure-conf"),
     fs = require("fs"),
     pw = require("pw");
+
+var environment = process.env["APP_ENV"] || "development";
 
 // core dependencies
 var logger = require('./src/utils/logger.js');
 var __smartfilename = path.basename(__filename);
 
-// define a helper for development debug of requests
-var serverLog = function(req, msg, type)
-{
-	var logMsg = "[" + type + "] " + msg + " (" + (req.headers ? req.headers['x-forwarded-for'] : "?") + " - "
-			   + (req.connection ? req.connection.remoteAddress : "?") + " - "
-			   + (req.socket ? req.socket.remoteAddress : "?") + " - "
-			   + (req.connection && req.connection.socket ? req.connection.socket.remoteAddress : "?") + ")";
-	logger.info(__smartfilename, __line, logMsg);
-};
-
-// define a helper to get the blockchain service
-var chainDataLayers = {};
-var getChainService = function(config)
-{
-	var thisBot = config.bot.walletAddress;
-	if (! chainDataLayers.hasOwnProperty(thisBot)) {
-		var blockchain = require('./src/blockchain/service.js');
-
-		chainDataLayers[thisBot] = new blockchain.service(config);
-	}
-
-	return chainDataLayers[thisBot];
-};
-
 // define a helper to process configuration file encryption
+var sconf = new SecureConf();
 var encryptConfig = function(pass)
 {
 	var dec = fs.readFileSync("config/bot.json");
@@ -67,92 +42,11 @@ var encryptConfig = function(pass)
 
 	fs.writeFileSync("config/bot.json.enc", enc);
 
-	if (app.settings.env == "production")
+	if (environment == "production")
 		// don't delete in development mode
 		fs.unlink("config/bot.json");
 
 	return true;
-};
-
-/**
- * Delayed route configuration. This will only be triggered when
- * the configuration file can be decrypted.
- *
- * Following is where we set our Bot's API endpoints. The API
- * routes list will change according to the Bot's "mode" config
- * value.
- */
-var initBotAPI = function(config)
-{
-	// configure body-parser usage for POST API calls.
-	app.use(bodyParser.urlencoded({ extended: true }));
-
-	if (config.bot.protectedEndpoints === true) {
-		// add Basic HTTP auth using nem-bot.htpasswd file
-
-		var basicAuth = auth.basic({
-		    realm: "This is a Highly Secured Area - Monkey at Work.",
-		    file: __dirname + "/nem-bot.htpasswd"
-		});
-		app.use(auth.connect(basicAuth));
-	}
-
-	var package = fs.readFileSync("package.json");
-	var botPackage = JSON.parse(package);
-
-	/**
-	 * API Routes
-	 *
-	 * Following routes are used for handling the business/data
-	 * layer provided by this NEM Bot.
-	 */
-	app.get("/api/v1/ping", function(req, res)
-		{
-			res.setHeader('Content-Type', 'application/json');
-			res.send(JSON.stringify({time: new Date().valueOf()}));
-		});
-
-	app.get("/api/v1/version", function(req, res)
-		{
-			res.setHeader('Content-Type', 'application/json');
-			res.send(JSON.stringify({version: botPackage.version}));
-		});
-
-	//XXX read config and serve given API endpoints.
-};
-
-/**
- * Delayed Server listener configuration. This will only be triggered when
- * the configuration file can be decrypted.
- *
- * Following is where we Start the express Server and where the routes will
- * be registered.
- */
-var initBotServer = function(config)
-{
-	/**
-	 * Now listen for connections on the Web Server.
-	 *
-	 * This starts the NodeJS server and makes the Game
-	 * available from the Browser.
-	 */
-	var port = process.env['PORT'] = process.env.PORT || 29081;
-	server.listen(port, function()
-		{
-			var network    = getChainService(config).getNetwork();
-			var blockchain = network.isTest ? "Testnet Blockchain" : network.isMijin ? "Mijin Private Blockchain" : "NEM Mainnet Public Blockchain";
-			var botWallet  = getChainService(config).getBotWallet();
-
-			console.log("------------------------------------------------------------------------");
-			console.log("--                       NEM Bot by eVias                             --");
-			console.log("------------------------------------------------------------------------");
-			console.log("-");
-			console.log("- NEM Bot Server listening on Port %d in %s mode", this.address().port, app.settings.env);
-			console.log("- NEM Bot is using blockchain: " + blockchain);
-			console.log("- NEM Bot Wallet is: " + botWallet);
-			console.log("-")
-			console.log("------------------------------------------------------------------------");
-		});
 };
 
 /**
@@ -180,11 +74,23 @@ var startBot = function(pass)
 		else {
 			try {
 				var config = JSON.parse(dec);
-				initBotAPI(config);
-				initBotServer(config);
+
+				try {
+					var server = require("./src/server.js");
+
+					// define a helper to get the blockchain service
+					var blockchain = require('./src/blockchain/service.js');
+					var chainDataLayer = new blockchain.service(config, logger);
+
+					var bot = new server.NEMBot(config, logger, chainDataLayer);
+				}
+				catch (e) {
+					logger.error(__smartfilename, __line, "Error with NEM Bot Server: " + e);
+					logger.warn(__smartfilename, __line, "NEM Bot now aborting.");
+				}
 			}
 			catch (e) {
-				logger.error(__smartfilename, __line, "Error with NEM Bot configuration: " + e);
+				logger.error(__smartfilename, __line, "Error with NEM Bot configuration. Invalid encryption password!");
 				logger.warn(__smartfilename, __line, "NEM Bot now aborting.");
 			}
 		}
@@ -198,7 +104,6 @@ var startBot = function(pass)
  * In case the configuration file is not encrypted yet, it will be encrypted
  * and the original file will be deleted.
  */
-var sconf = new SecureConf();
 var pass  = process.env["ENCRYPT_PASS"] || "";
 
 if (typeof pass == 'undefined' || ! pass.length) {

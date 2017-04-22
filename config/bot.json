@@ -1,9 +1,14 @@
 {
     "bot": {
         "mode": "read",
-        "walletAddress": "TC72N5Y5WFA7KMI2VG3B7T67EQXGB4ATDXCTJGKE",
+        "name": "NEMBot eVias #1",
+        "walletAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
         "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots",
-        "protectedEndpoints": true
+        "protectedAPI": true,
+        "db": {
+            "type": "json",
+            "name": "db/nembot_evias_1_json"
+        }
     },
     "nem": {
         "isTestMode": true,
