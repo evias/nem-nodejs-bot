@@ -1,6 +1,6 @@
 {
 	"name": "nem-nodejs-bot",
-	"version": "0.1.0",
+	"version": "0.1.2",
 	"author": "Grégory Saive <greg@evias.be>",
 	"description": "NEM Blockchain Bot for Node.js applications",
 	"keywords": "nem, blockchain, payment channels, multi signature, cosignatory, bot",

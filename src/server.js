@@ -23,7 +23,8 @@ var app = require('express')(),
     bodyParser = require("body-parser"),
     fs = require("fs"),
     io = require('socket.io').listen(server),
-    JsonDB = require("node-json-db");
+    JsonDB = require("node-json-db"),
+    PaymentChannelRepository = require("./blockchain/payment-channel.js").PaymentChannelRepository;
 
 var NEMBot = function(config, logger, chainDataLayer)
 {
@@ -48,7 +49,6 @@ var NEMBot = function(config, logger, chainDataLayer)
     {
         this.db = new JsonDB(config.bot.db.name); //XXX read bot.db.type to know which DBMS to use.
 
-        //this.db.delete("/channels");
         try {
             this.channels_ = this.db.getData("/channels");
         }
@@ -196,7 +196,8 @@ var NEMBot = function(config, logger, chainDataLayer)
         var self = this;
 
         var backends_connected_ = {},
-            payment_channels_   = {};
+            payment_channels_   = {},
+            channelsDb_ = new PaymentChannelRepository(self.db);
 
         io.sockets.on('connection', function(socket)
         {
@@ -209,31 +210,7 @@ var NEMBot = function(config, logger, chainDataLayer)
                 logger.info("src/server.js", __line, '[' + socket.id + '] open_channel(' + channelOpts + ')');
 
                 var options = JSON.parse(channelOpts);
-
-                try {
-                    // find an ACTIVE payment channel with the same SENDER.
-                    // This would mean an OPEN INVOICE.
-                    try {
-                        // check if maybe the channel was not closed, re-use.
-                        var channel = self.db.getData("/channels/open/" + options.sender);
-                    }
-                    catch (e) {
-                        // check if any active channel is available for this sender.
-                        var channel = self.db.getData("/channels/active/" + options.sender);
-                        self.db.push("/channels/open", channel, false); // dont override, merge!
-                    }
-                }
-                catch (e) {
-                    // channel does not exist yet, create now.
-
-                    var emptyChannel = {};
-                    emptyChannel[options.sender] = options;
-
-                    self.db.push("/channels/open", emptyChannel, false); // dont override, merge!
-                    self.db.push("/channels/active", emptyChannel, false); // dont override, merge!
-
-                    var channel = {};
-                }
+                var channel = channelsDb_.fetchChannelByAddress(options.sender, options, true);
 
                 // configure blockchain service WebSockets
                 var paymentChannel = payment_channels_[socket.id]
@@ -243,10 +220,9 @@ var NEMBot = function(config, logger, chainDataLayer)
             socket.on('nembot_close_payment_channel', function (sender) {
                 logger.info("src/server.js", __line, '[' + socket.id + '] close_channel(' + sender + ')');
 
-                // delete this payment channel from the OPEN list (might still be /active)
-                self.db.delete("/channels/open/" + sender);
+                channelsDb_.closeChannel(sender);
 
-                if (payment_channels[socket.id]) {
+                if (payment_channels_[socket.id]) {
                     delete payment_channels_[socket.id];
                 }
             });
@@ -254,11 +230,9 @@ var NEMBot = function(config, logger, chainDataLayer)
             socket.on('nembot_finish_payment_channel', function (sender) {
                 logger.info("src/server.js", __line, '[' + socket.id + '] finish_channel(' + sender + ')');
 
-                // delete this payment channel from the ACTIVE list (might still be /active)
-                self.db.delete("/channels/open/" + sender);
-                self.db.delete("/channels/active/" + sender);
+                channelsDb_.finishChannel(sender);
 
-                if (payment_channels[socket.id]) {
+                if (payment_channels_[socket.id]) {
                     delete payment_channels_[socket.id];
                 }
             });
@@ -267,15 +241,14 @@ var NEMBot = function(config, logger, chainDataLayer)
             socket.on('nembot_payment_status_update', function (updateData) {
                 var options = JSON.parse(updateData);
 
-                self.db.push("/channels/open/" + options.sender, options, false);
-                self.db.push("/channels/active/" + options.sender, options, false);
+                channelsDb_.updateChannel(options.sender, options);
             });
 
             socket.on('nembot_disconnect', function () {
                 logger.info("src/server.js", __line, '[' + socket.id + '] ~nembot()');
 
                 // delete this payment channel from the OPEN list (might still be /active)
-                self.db.delete("/channels/open/" + sender);
+                channelsDb_.closeChannel(sender);
 
                 if (backends_connected_.hasOwnProperty(socket.id))
                     delete backends_connected_[socket.id];

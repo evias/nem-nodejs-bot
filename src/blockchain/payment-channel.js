@@ -135,5 +135,72 @@ var PaymentChannel = function(chainDataLayer, socket, data)
     }
 };
 
+var PaymentChannelRepository = function(db)
+{
+    this.db_ = db;
+
+    this.fetchChannelByAddress = function(address, data, doOpen)
+    {
+        var emptyChannel = {};
+        emptyChannel[address] = data;
+
+        var channel = emptyChannel;
+        try {
+            try {
+                // check if maybe the channel was not closed, re-use.
+                channel = this.db_.getData("/channels/open/" + address);
+            }
+            catch (e) {
+                // check if any active channel is available for this sender.
+                channel = this.db_.getData("/channels/active/" + address);
+
+                if (doOpen === true) {
+                    // we found an ACTIVE channel, add it to the open pool.
+                    this.db_.push("/channels/open", channel, false); // dont override, merge!
+                }
+            }
+        }
+        catch (e) {
+            // channel does not exist yet, create now.
+            channel = emptyChannel;
+            channel.saved = true;
+
+            this.db_.push("/channels/open", emptyChannel, false); // dont override, merge!
+            this.db_.push("/channels/active", emptyChannel, false); // dont override, merge!
+        }
+
+        return channel;
+    };
+
+    this.closeChannel = function(address)
+    {
+        // delete this payment channel from the OPEN list (might still be /active)
+        this.db_.delete("/channels/open/" + sender);
+    };
+
+    this.finishChannel = function(address)
+    {
+        var self    = this;
+        var channel = self.fetchChannelByAddress(address, {}, false);
+
+        self.closeChannel(address);
+        try {
+            var channelData = self.db_.getData("/channels/active/" + sender);
+            self.db_.delete("/channels/active/" + sender);
+        }
+        catch (e) {}
+
+        // archive this channel
+        self.db.push("/archives", channel);
+    };
+
+    this.updateChannel = function(address, data)
+    {
+        this.db_.push("/channels/open/" + address, data, false);
+        this.db_.push("/channels/active/" + address, data, false);
+    };
+};
+
 module.exports.PaymentChannel = PaymentChannel;
+module.exports.PaymentChannelRepository = PaymentChannelRepository;
 }());

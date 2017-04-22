@@ -2,7 +2,7 @@
     "bot": {
         "mode": "read",
         "name": "NEMBot eVias #1",
-        "walletAddress": "TC72N5Y5WFA7KMI2VG3B7T67EQXGB4ATDXCTJGKE",
+        "walletAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
         "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots",
         "protectedAPI": true,
         "db": {
