@@ -34,7 +34,6 @@ var NEMBot = function(config, logger, chainDataLayer)
     this.environment_ = process.env["APP_ENV"] || "development";
 
     this.db        = new models.NEMBotDB(config, io, chainDataLayer);
-    this.channels_ = {};
 
     // define a helper for development debug of requests
     this.serverLog = function(req, msg, type)
@@ -126,8 +125,7 @@ var NEMBot = function(config, logger, chainDataLayer)
      * Delayed Server listener configuration. This will only be triggered when
      * the configuration file can be decrypted.
      *
-     * Following is where we Start the express Server and where the routes will
-     * be registered.
+     * Following is where we Start the express Server for out Bot HTTP API.
      */
     this.initBotServer = function(config)
     {
@@ -150,31 +148,6 @@ var NEMBot = function(config, logger, chainDataLayer)
                 var currentBotMode= self.config_.bot.mode;
                 var botLabel = self.config_.bot.name;
 
-                var features = {
-                    "read": [
-                        "Payment Channel Listening",
-                        "Balance Modifications Listening",
-                        "Cosignatory Auditing"
-                    ],
-                    "sign": ["Multi Signature Transaction Co-Signing"],
-                    "tip": ["Tipper Bot"]
-                };
-
-                var allFeatures = features.read.concat(features.sign).concat(features.tip);
-
-                if (typeof currentBotMode == "string")
-                    var botFeatures = features.hasOwnProperty(currentBotMode) ? features[currentBotMode] : allFeatures;
-                else {
-                    var botFeatures = [];
-                    for (var j in currentBotMode) {
-                        var mode = currentBotMode[j];
-                        botFeatures.concat(features[mode]);
-                    }
-                }
-
-                var grnFeature  = "\t\u001b[32mYES\u001b[0m\t";
-                var redFeature  = "\t\u001b[31mNO\u001b[0m\t";
-
                 console.log("------------------------------------------------------------------------");
                 console.log("--                       NEM Bot by eVias                             --");
                 console.log("------------------------------------------------------------------------");
@@ -186,6 +159,22 @@ var NEMBot = function(config, logger, chainDataLayer)
                 console.log("- NEM Bot Tips with Wallet: " + botTipperWallet);
                 console.log("-");
                 console.log("- NEMBot Name is " + botLabel + " with Features: ");
+
+                var features = {
+                    "read": [
+                        "Payment Reception Listening (Payment Processor)",
+                        "Balance Modifications Listening (Payment Processor)",
+                        "Multi Signature Accounts Co-Signatory Auditing"
+                    ],
+                    "sign": ["Multi Signature Transaction Co-Signing"],
+                    "tip": [
+                        "Reddit Tip Bot",
+                        "Telegram Tip Bot",
+                        "NEM Forum Tip Bot"
+                    ]
+                };
+                var grnFeature = "\t\u001b[32mYES\u001b[0m\t";
+                var redFeature = "\t\u001b[31mNO\u001b[0m\t";
 
                 for (var i in features.read)
                     console.log ((self.blockchain_.isReadBot() ? grnFeature : redFeature) + features.read[i]);
