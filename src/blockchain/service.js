@@ -50,6 +50,7 @@ var service = function(config, logger)
     var botMode_ = process.env["BOT_MODE"] || conf_.bot.mode;
     var botReadWallet_ = (process.env["BOT_READ_WALLET"] || conf_.bot.read.walletAddress).replace(/-/g, "");
     var botSignWallet_ = (process.env["BOT_SIGN_WALLET"] || conf_.bot.sign.walletAddress).replace(/-/g, "");
+    var botTipperWallet_ = (process.env["BOT_TIPPER_WALLET"] || conf_.bot.tipper.walletAddress).replace(/-/g, "");
 
     // define a helper for development debug of websocket
     this.socketLog = function(msg, type)
@@ -132,6 +133,19 @@ var service = function(config, logger)
     this.getBotSignWallet = function()
     {
         return botReadWallet_;
+    };
+
+    /**
+     * Get this bot's TIPPER Wallet Address
+     *
+     * This is the wallet used for Tipper Bot features,
+     * the privateKey must be set for this feature to work.
+     *
+     * @return string   XEM account address for the Bot
+     */
+    this.getBotTipperWallet = function()
+    {
+        return botTipperWallet_;
     };
 
     /**

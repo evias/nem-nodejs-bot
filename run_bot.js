@@ -90,7 +90,7 @@ var startBot = function(pass)
 				}
 			}
 			catch (e) {
-				logger.error(__smartfilename, __line, "Error with NEM Bot configuration. Invalid encryption password!");
+				logger.error(__smartfilename, __line, "Error with NEM Bot configuration. Invalid encryption password: " + e);
 				logger.warn(__smartfilename, __line, "NEM Bot now aborting.");
 			}
 		}

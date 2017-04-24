@@ -291,7 +291,6 @@ var NEMBot = function(config, logger, chainDataLayer)
     var self = this;
     {
         // new instances automatically init the server and endpoints
-        self.initBotDatabase(self.config_);
         self.initBotAPI(self.config_);
         self.initSocketProxy(self.config_);
         self.initBotServer(self.config_);

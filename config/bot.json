@@ -8,11 +8,11 @@
         },
         "sign": {
             "walletAddress": "TBPGYGLO4QMZLVR4TZF7GSL5IHJAUNPFXFNEEP4V",
-            "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots",
+            "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots"
         },
         "tipper": {
             "walletAddress": "TCKUDISVSIGYAKVABLTN2MUFWWITWK6US5XHPCGV",
-            "privateKey": "Only insert your Private Key for Tipper Bots",
+            "privateKey": "Only insert your Private Key for Tipper Bots"
         },
         "protectedAPI": true,
         "db": {
