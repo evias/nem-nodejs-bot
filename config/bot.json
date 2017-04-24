@@ -2,12 +2,21 @@
     "bot": {
         "mode": "read",
         "name": "NEMBot eVias #1",
-        "walletAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
-        "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots",
+        "read": {
+            "walletAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
+            "duration": 300000
+        },
+        "sign": {
+            "walletAddress": "TBPGYGLO4QMZLVR4TZF7GSL5IHJAUNPFXFNEEP4V",
+            "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots",
+        },
+        "tipper": {
+            "walletAddress": "TCKUDISVSIGYAKVABLTN2MUFWWITWK6US5XHPCGV",
+            "privateKey": "Only insert your Private Key for Tipper Bots",
+        },
         "protectedAPI": true,
         "db": {
-            "type": "json",
-            "name": "db/nembot_evias_1_json"
+            "uri": "mongodb://localhost/NEMBotDB"
         }
     },
     "nem": {
