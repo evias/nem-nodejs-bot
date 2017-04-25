@@ -1,14 +1,22 @@
 {
 	"name": "nem-nodejs-bot",
 	"version": "0.2.1",
-	"author": "Grégory Saive <greg@evias.be>",
-	"description": "NEM Blockchain Bot for Node.js applications",
-	"keywords": "nem, blockchain, payment channels, multi signature, cosignatory, bot",
-	"repository": {
-	    "type": "git",
-		"url": "https://github.com/evias/nem-nodejs-bot.git"
-	},
 	"license": "MIT",
+    "author": {
+        "name": "Grégory Saive",
+        "email": "greg@evias.be",
+        "url": "https://github.com/evias"
+    },
+    "description": "NEM Blockchain Bot for Node.js applications",
+    "keywords": "nem, blockchain, payment channels, multi signature, cosignatory, bot",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/evias/nem-nodejs-bot.git"
+    },
+    "homepage": "https://github.com/evias/nem-nodejs-bot",
+    "bugs": {
+        "url": "https://github.com/evias/nem-nodejs-bot/issues"
+    },
 	"dependencies":
 	{
         "express": "~3.3.4",

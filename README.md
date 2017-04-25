@@ -61,6 +61,42 @@ Your bot is now running on localhost! The **API** is published on **port 29081**
 The config/bot.json file will only be removed in "production" mode. The environment is defined by the **APP_ENV** environment variables and
 default to **development**.
 
+Configuration
+-------------
+
+The ```config/bot.json``` configuration file contains all configuration for the NEMBot. Following are details for each of the field in this
+configuration field:
+
+```
+    - bot.mode : Type: text. Possible values: "read", "sign", "tip", "all". Defines the Type of Bot.
+    - bot.name : Type: text. Labelling for your NEMBot.
+    - bot.protectedAPI : Type: boolean. Whether to enable HTTP Basic Auth (true) or not (false).
+    - bot.db.uri : Type: text. MongoDB URI, only used if MONGODB_URI and MONGOLAB_URI env variables are not provided (non-heroku).
+
+    Payment Processing
+    -------------------
+    - bot.read.walletAddress : Type: text. XEM Address of the Account for which the Bot should Listen to Payments.
+    - bot.read.duration : Type: integer. Default Payment Channel duration (5 minutes) - expressed in Milliseconds.
+
+    MultiSig Co-Signing
+    -------------------
+    - bot.sign.multisigAddress : Type: text. XEM Address of the Multi Signature Account of which this Bot is a Co-Signatory.
+    - bot.sign.walletAddress : Type: text. XEM Address of the Account to **use** for Co-Signing Multi Signature Transactions.
+    - bot.sign.privateKey : Type: text. Private Key of the Account to **use** for Co-Signing Multi Signature Transactions. (Should be the Private Key of the Account ```bot.sign.walletAddress```).
+
+    Tipper Features
+    ---------------
+    - bot.tipper.walletAddress : Type: text. XEM Address of the Account to use for Tipping. (Sending money in demande of tippers)
+    - bot.tipper.privateKey : Type: text. Private Key of the Account to use for Tipping. (Should be the Private Key of the Account ```bot.tipper.walletAddress```)
+
+    NEM Blockchain Configuration
+    ----------------------------
+    - nem.isTestMode : Type: boolean. Whether to work with the Testnet Blockchain (true) or the Mainnet Blockchain (false).
+    - nem.isMijin : Type: boolean. Whether we are using Mijin Network (true) or not (false).
+    - nem.nodes[x]: Type: object. Configure Mainnet default Blockchain Nodes.
+    - nem.nodes_test[x]: Type: object. Configure Testnet default Blockchain Nodes.
+```
+
 Deploy on Heroku
 ----------------
 

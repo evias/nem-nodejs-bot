@@ -7,6 +7,7 @@
             "duration": 300000
         },
         "sign": {
+            "multisigAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
             "walletAddress": "TBPGYGLO4QMZLVR4TZF7GSL5IHJAUNPFXFNEEP4V",
             "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots"
         },

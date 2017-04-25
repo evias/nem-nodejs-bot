@@ -192,6 +192,7 @@ var service = function(config, logger)
         var channel_   = paymentChannel;
         var params_    = params;
         var nemsocket_ = new api_(nemHost + ":" + nemPort);
+        var caughtTrxs_= {};
 
         // configure timeout
         var startTime_ = new Date().valueOf();
@@ -234,26 +235,36 @@ var service = function(config, logger)
                 for (var i in incomings) {
                     var content = incomings[i].transaction;
                     var meta    = incomings[i].meta;
-                    var trxHash = meta.hash.data;
-                    if (meta.innerHash.data && meta.innerHash.data.length)
-                        trxHash = meta.innerHash.data;
+                    var trxHash = self.getTransactionHash(incomings[i]);
 
                     var paymentData = {};
                     if (false === (paymentData = paymentChannel.matchTransactionData(content, "confirmed")))
                         continue; // transaction irrelevant for current `paymentChannel`
 
-                    self.emitPaymentUpdate(paymentChannel, transactionData, eventData);
+                    // check if Websocket caught this transaction (in confirmed state)
+                    if (caughtTrxs_.hasOwnProperty(trxHash) && caughtTrxs_[trxHash].status == "confirmed")
+                        continue; // transaction processed already.
+
+                    caughtTrxs_[trxHash] = {status: "confirmed", time: new Date().valueOf()};
+                    self.emitPaymentUpdate(backend_, paymentChannel, transactionData, eventData);
                 }
             });
         };
 
         // fallback handler queries the blockchain every 20 seconds
-        setInterval(function()
+        var fallbackInterval = setInterval(function()
         {
             // XXX should also check the Block Height and Last Block to know whether there CAN be new data.
 
             websocketFallbackHandler(paymentChannel);
         }, 30 * 1000);
+
+        setTimeout(function() {
+            clearInterval(fallbackInterval);
+
+            // closing channel, update one more time.
+            websocketFallbackHandler(paymentChannel);
+        }, duration_);
 
         nemsocket_.connectWS(function()
         {
@@ -275,34 +286,60 @@ var service = function(config, logger)
 
                 var transactionData = JSON.parse(message.body);
                 var transaction     = transactionData.transaction;
+                var trxHash         = self.getTransactionHash(transactionData);
 
                 var paymentData = {};
                 if (false === (paymentData = paymentChannel.matchTransactionData(transaction, "unconfirmed")))
                     return false;
 
-                self.emitPaymentUpdate(paymentChannel, transactionData, paymentData, "unconfirmed");
+                // check if fallback caught this transaction before websocket (very unlikely)
+                if (caughtTrxs_.hasOwnProperty(trxHash))
+                    continue; // transaction processed already (could be both unconfirmed or confirmed).
+
+                caughtTrxs_[trxHash] = {status: "unconfirmed", time: new Date().valueOf()};
+                self.emitPaymentUpdate(backend_, paymentChannel, transactionData, paymentData, "unconfirmed");
             });
 
             nemsocket_.subscribeWS("/transactions/" + self.getBotReadWallet(), function(message) {
                 var transactionData = JSON.parse(message.body);
                 var transaction     = transactionData.transaction;
+                var trxHash         = self.getTransactionHash(transactionData);
 
                 var paymentData = {};
                 if (false === (paymentData = paymentChannel.matchTransactionData(transaction, "confirmed")))
                     return false;
 
-                self.emitPaymentUpdate(paymentChannel, transactionData, paymentData, "confirmed");
+                // check if fallback caught this transaction before websocket (very unlikely)
+                if (caughtTrxs_.hasOwnProperty(trxHash) && caughtTrxs_[trxHash].status == "confirmed")
+                    continue; // transaction processed already
+
+                caughtTrxs_[trxHash] = {status: "confirmed", time: new Date().valueOf()};
+                self.emitPaymentUpdate(backend_, paymentChannel, transactionData, paymentData, "confirmed");
             });
 
         }, websocketErrorHandler);
     };
 
-    this.emitPaymentUpdate = function(paymentChannel, transactionData, paymentData, status)
+    /**
+     * This method EMITS a payment status update back to the Backend connected
+     * to this NEMBot.
+     *
+     * It will also save the transaction data into the NEMBotDB.NEMPaymentChannel
+     * model and save to the database.
+     *
+     * @param  {socket.io} backendSocket
+     * @param  {NEMPaymentChannel} paymentChannel
+     * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionData
+     * @param  {object} paymentData
+     * @param  {string} status
+     * @return {NEMPaymentChannel}
+     */
+    this.emitPaymentUpdate = function(backendSocket, paymentChannel, transactionData, paymentData, status)
     {
         var eventData = paymentData;
         eventData.status = status;
 
-        backend_.emit("nembot_payment_status_update", JSON.stringify(eventData));
+        backendSocket.emit("nembot_payment_status_update", JSON.stringify(eventData));
 
         if ("confirmed" == status) {
             paymentChannel.amountPaid += transaction.amount;
@@ -327,7 +364,28 @@ var service = function(config, logger)
         // update our bot database too
         paymentChannel = paymentChannel.addTransaction(transactionData);
         paymentChannel.save();
+
+        return paymentChannel;
     }
+
+    /**
+     * Read the Transaction Hash from a given TransactionMetaDataPair
+     * object (gotten from NEM websockets or API).
+     *
+     * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionData
+     * @return {string}
+     */
+    this.getTransactionHash = function(transactionData)
+    {
+        var meta    = transactionData.meta;
+        var content = transactionData.transaction;
+
+        var trxHash = meta.hash.data;
+        if (meta.innerHash.data && meta.innerHash.data.length)
+            trxHash = meta.innerHash.data;
+
+        return trxHash;
+    };
 
     var self = this;
     {
