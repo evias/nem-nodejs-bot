@@ -40,7 +40,7 @@ The bot can be configured to execute any of the following features:
  - Multi Signature Transaction Co-Signing (mode **sign**)
  - Tip Bots (HTTP/JSON API) (mode **tip**)
 
-Only WRITE features need your Private Key, change the "mode" config to "read" or "sign" or "tip" or "all" to enable/disable read and write.
+Only SIGN and TIP features need your Private Key, change the "mode" config to "read" or "sign" or "tip" or "all" to enable/disable read and write.
 You can also use an array for configuring the bot to use ["read", "tip"] features for example. The tipper bot features also need a Private Key.
 
 For a local installation, first install the dependencies of this package. Using the terminal works as follows:
@@ -56,7 +56,7 @@ After configuration, you can start the Bot, locally this would be:
     $ npm run_bot.js
 ```
 
-Your bot is now running on localhost! The API is published on port 29081 by default.
+Your bot is now running on localhost! The **API** is published on **port 29081** by default.
 
 The config/bot.json file will only be removed in "production" mode. The environment is defined by the **APP_ENV** environment variables and
 default to **development**.
@@ -70,7 +70,7 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
 ```
     - Required:
         - APP_ENV : Environment of your NEMBot. Can be either production or development.
-        - ENCRYPT_PASS : Should contain the configuration file encryption password.
+        - ENCRYPT_PASS : Should contain the configuration file encryption password. (if not set, will ask in terminal)
         - PORT : Should contain the Port on which the Bot HTTP/JSON API & Websockets will be addressed.
 
     - Optional :
@@ -107,7 +107,13 @@ This example implements following Flow:
 This can be understood as follows:
 
 ```
-    jQuery > Node.js > NEMBot > NEM Blockchain > NEMBot > Node.js > jQuery
+    Frontend  >   Backend >   NEMBot ->|
+                                       |
+                             ---------------------
+                             | NEM Blockchain    |
+                             ---------------------
+                                       |
+    Frontend  <   Backend <   NEMBot <-|
 ```
 
 So lets define the details about this scenario. Your BACKEND will use socket.io to send events
@@ -132,6 +138,23 @@ io.sockets.on('connection', function(socket)
         if (frontends_connected_.hasOwnProperty(socket.id))
             delete frontends_connected_[socket.id];
     });
+});
+
+// example is GET /create-invoice?client=XXX_sfwe2
+expressApp.get("/create-invoice", function(req, res)
+{
+    var clientSocketId = req.query.client ? req.query.client : null;
+    if (! clientSocketId || ! clientSocketId.length)
+        res.send(JSON.stringify({"status": "error", "message": "Mandatory field `Client Socket ID` is invalid."}));
+
+    // do your DB work ..
+
+    // now start a payment channel with the bot.
+    startPaymentChannel(clientSocketId, function(invoiceSocket)
+        {
+            // payment channel is now open, we can end the create-invoice response.
+            res.send({"status": "ok"}, 200);
+        });
 });
 
 var startPaymentChannel = function(clientSocketId, callback)
@@ -164,23 +187,6 @@ var startPaymentChannel = function(clientSocketId, callback)
 
         callback(invoiceSocket);
     };
-
-// example is GET /create-invoice?client=XXX_sfwe2
-expressApp.get("/create-invoice", function(req, res)
-{
-    var clientSocketId = req.query.client ? req.query.client : null;
-    if (! clientSocketId || ! clientSocketId.length)
-        res.send(JSON.stringify({"status": "error", "message": "Mandatory field `Client Socket ID` is invalid."}));
-
-    // do your DB work ..
-
-    // now start a payment channel with the bot.
-    startPaymentChannel(clientSocketId, function(invoiceSocket)
-        {
-            // payment channel is now open, we can end the create-invoice response.
-            res.send({"status": "ok"}, 200);
-        });
-});
 ```
 
 ```
@@ -209,7 +215,7 @@ Pot de vin
 
 If you like the initiative, and for the sake of good mood, I recommend you take a few minutes to Donate a beer or Three [because belgians like that] by sending some XEM (or whatever Mosaic you think pays me a few beers someday!) to my Wallet:
 ```
-    NB72EM6TTSX72O47T3GQFL345AB5WYKIDODKPPYW
+    NCK34K5LIXL4OMPDLVGPTWPZMGFTDRZQEBRS5Q2S
 ```
 
 License
