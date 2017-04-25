@@ -207,24 +207,47 @@ var NEMBot = function(config, logger, chainDataLayer)
         var self = this,
             backends_connected_ = {};
 
-        io.sockets.on('connection', function(socket)
+        io.sockets.on('connection', function(botSocket)
         {
-            logger.info("src/server.js", __line, '[' + socket.id + '] nembot()');
-            backends_connected_[socket.id] = socket;
+            logger.info("src/server.js", __line, '[' + botSocket.id + '] nembot()');
+            backends_connected_[botSocket.id] = botSocket;
 
+            // NEMBot "read" features:
+            // - Payment Processor: Listening to Payment Updates
+            //     - Payment Channels are database entries linking Blockchain transactions
+            //       with specific Payment Messages and Sender XEM addresses.
+            //     - Payment Channels entries' recipientXEM field will always contain the
+            //       XEM address of this NEMBot (```config.bot.read.walletAddress```).
             if (self.blockchain_.isReadBot()) {
-                self.configurePaymentChannelWebsockets(socket);
+                self.configurePaymentChannelWebsockets(botSocket);
             }
 
-            socket.on('nembot_disconnect', function () {
-                logger.info("src/server.js", __line, '[' + socket.id + '] ~nembot()');
+            // NEMBot "sign" features:
+            // - Multi Signature Transactions Co-Signing automatization
+            if (self.blockchain_.isSignBot()) {
+                //XXX
+            }
 
-                if (backends_connected_.hasOwnProperty(socket.id))
-                    delete backends_connected_[socket.id];
+            botSocket.on('nembot_disconnect', function () {
+                logger.info("src/server.js", __line, '[' + botSocket.id + '] ~nembot()');
+
+                if (backends_connected_.hasOwnProperty(botSocket.id))
+                    delete backends_connected_[botSocket.id];
             });
         });
     };
 
+    /**
+     * This method should be called only if the NEMBot has "read" features enabled.
+     *
+     * It will register a Websocket Event Listener for the event "nembot_open_payment_channel".
+     *
+     * When the event ```nembot_open_payment_channel``` is triggered, the Blockchain Read Service
+     * is used to initiate a "Payment Processor Listening" which will identify Transactions on
+     * the NEM Blockchain containing a given ```sender``` and ```message```.
+     *
+     * @param  {socket.io} botSocket [description]
+     */
     this.configurePaymentChannelWebsockets = function(botSocket)
     {
         var self = this;
@@ -248,11 +271,11 @@ var NEMBot = function(config, logger, chainDataLayer)
             self.db.NEMPaymentChannel.findOne(channelQuery, function(err, paymentChannel)
             {
                 if (! err && paymentChannel) {
-                    // channel exists - not fulfilled
-                    self.blockchain_.listenForPayment(botSocket, paymentChannel, {duration: params.maxDuration});
+                    // channel exists - not fulfilled - re-use and LISTEN
+                    self.blockchain_.getPaymentProcessor().listenForPayment(botSocket, paymentChannel, {duration: params.maxDuration});
                 }
                 else if (! err) {
-                    // create new channel
+                    // create new channel then LISTEN
                     var paymentChannel = new self.db.NEMPaymentChannel({
                         recipientXEM: params.recipient,
                         payerXEM: params.sender,
@@ -267,7 +290,7 @@ var NEMBot = function(config, logger, chainDataLayer)
 
                     paymentChannel.save(function(err, paymentChannel)
                     {
-                        self.blockchain_.listenForPayment(botSocket, paymentChannel, {duration: params.maxDuration});
+                        self.blockchain_.getPaymentProcessor().listenForPayment(botSocket, paymentChannel, {duration: params.maxDuration});
                     });
                 }
                 else {

@@ -49,6 +49,7 @@ var NEMBotDB = function(config, io, chainDataLayer)
         recipientXEM: String,
         socketIds: [String],
         transactionHashes: Object,
+        notifyUrl: String,
         amount: {type: Number, min: 0},
         amountPaid: {type: Number, min: 0},
         amountUnconfirmed: {type: Number, min: 0},
