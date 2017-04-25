@@ -62,6 +62,19 @@ var NEMBotDB = function(config, io, chainDataLayer)
     });
 
     this.NEMPaymentChannel_.methods = {
+        toDict: function()
+        {
+            return {
+                sender: this.payerXEM,
+                recipient: this.recipientXEM,
+                amount: this.amount,
+                amountPaid: this.amountPaid,
+                amountUnconfirmed: this.amountUnconfirmed,
+                message: this.message,
+                status: this.status,
+                isPaid: this.isPaid
+            };
+        },
         getPayer: function()
         {
             return this.payerXEM.replace(/-/g, "");
@@ -86,7 +99,7 @@ var NEMBotDB = function(config, io, chainDataLayer)
 
             return invoiceData;
         },
-        matchTransactionData: function(transaction, status)
+        matchTransactionData: function(transaction, status, obligatoryMessage)
         {
             if (! transaction || transaction.recipient != this.recipientXEM)
                 return false;
@@ -105,19 +118,26 @@ var NEMBotDB = function(config, io, chainDataLayer)
             var paymentData = {};
             if (sender == this.payerXEM)
                 paymentData.sender = this.payerXEM;
+            else
+                return false;
 
-            if (this.message.length && transaction.message && transaction.message.type === 1) {
+            if (obligatoryMessage === true && (!transaction.message || !transaction.message.payload))
+                return false; // missing message in incoming transaction!
+
+            if (transaction.message && transaction.message.type === 1) {
                 // message available, check if it contains the `invoiceNumber`
                 var payload = transaction.message.payload;
                 var plain   = blockchain_.nem().utils.convert.hex2a(payload);
 
-                if (plain == this.message) {
-                    paymentData.invoice = this.message;
-                    return paymentData;
+                if (plain != this.message) {
+                    return false;
                 }
+
+                paymentData.invoice = this.message;
+                return paymentData;
             }
 
-            return paymentData.sender ? paymentData : false;
+            return obligatoryMessage !== true && paymentData.sender ? paymentData : false;
         },
         addTransaction: function(transaction)
         {

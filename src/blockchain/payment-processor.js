@@ -55,7 +55,7 @@ var PaymentProcessor = function(chainDataLayer)
      * @param  {object} params
      * @return {NEMPaymentChannel}
      */
-    this.listenForPayment = function(forwardedToSocket, paymentChannel)
+    this.listenForPayment = function(forwardedToSocket, paymentChannel, params)
     {
         var self = this;
         var backend_   = forwardedToSocket;
@@ -66,13 +66,13 @@ var PaymentProcessor = function(chainDataLayer)
 
         // configure timeout
         var startTime_ = new Date().valueOf();
-        var duration_  = typeof params != 'undefined' && params.duration ? params.duration : conf_.bot.read.duration;
+        var duration_  = typeof params != 'undefined' && params.duration ? params.duration : this.blockchain_.conf_.bot.read.duration;
 
         duration_ = parseInt(duration_);
         if (isNaN(duration_) || duration_ <= 0)
             duration_ =  15 * 60 * 1000;
 
-        var endTime_ = startTime + duration_;
+        var endTime_ = startTime_ + duration_;
 
         // define helper for websocket error handling
         var websocketErrorHandler = function(error)
@@ -99,18 +99,22 @@ var PaymentProcessor = function(chainDataLayer)
         {
             // XXX should also check the Block Height and Last Block to know whether there CAN be new data.
 
-            self.blockchain_.nem().com.requests.incomingTransactions(self.blockchain_.endpoint(), paymentChannel.recipientXEM)
-            .then(function(res)
+            // read the payment channel recipient's incoming transaction to check whether the Websocket
+            // has missed any (happens maybe only on testnet, but this is for being sure.). The same event
+            // will be emitted in case a transaction is found un-forwarded.
+            self.blockchain_.nem().com.requests.account.incomingTransactions(self.blockchain_.endpoint(), paymentChannel.getRecipient())
+                .then(function(res)
             {
                 var incomings = res;
 
                 for (var i in incomings) {
-                    var content = incomings[i].transaction;
-                    var meta    = incomings[i].meta;
-                    var trxHash = self.getTransactionHash(incomings[i]);
+                    var transaction = incomings[i];
+                    var meta    = transaction.meta;
+                    var content = transaction.transaction;
+                    var trxHash = self.getTransactionHash(transaction);
 
                     var paymentData = {};
-                    if (false === (paymentData = paymentChannel.matchTransactionData(content, "confirmed")))
+                    if (false === (paymentData = paymentChannel.matchTransactionData(content, "confirmed", true)))
                         continue; // transaction irrelevant for current `paymentChannel`
 
                     // check if Websocket caught this transaction (in confirmed state)
@@ -120,7 +124,7 @@ var PaymentProcessor = function(chainDataLayer)
                         continue; // transaction processed already (and saved to db ;).
 
                     caughtTrxs_[trxHash] = {status: "confirmed", time: new Date().valueOf()};
-                    self.emitPaymentUpdate(backend_, paymentChannel, transactionData, eventData);
+                    self.emitPaymentUpdate(backend_, paymentChannel, transaction, paymentData, "confirmed");
                 }
             });
         };
@@ -153,41 +157,42 @@ var PaymentProcessor = function(chainDataLayer)
 
             //XXX NEM Websocket new blocks Listener => Should verify confirmations about our payment channels.
 
-            // NEM Websocket unconfirmed transaction Listener (Read Bot)
-            nemsocket_.subscribeWS("/unconfirmed/" + self.getBotReadWallet(), function(message) {
+            // NEM Websocket unconfirmed transactions Listener
+            nemsocket_.subscribeWS("/unconfirmed/" + paymentChannel.getRecipient(), function(message) {
 
                 var transactionData = JSON.parse(message.body);
                 var transaction     = transactionData.transaction;
                 var trxHash         = self.getTransactionHash(transactionData);
 
                 var paymentData = {};
-                if (false === (paymentData = paymentChannel.matchTransactionData(transaction, "unconfirmed")))
+                if (false === (paymentData = paymentChannel.matchTransactionData(transaction, "unconfirmed", true)))
                     return false;
 
                 // check if fallback caught this transaction before websocket (very unlikely)
                 if (caughtTrxs_.hasOwnProperty(trxHash))
-                    continue; // transaction processed already (could be both unconfirmed or confirmed).
+                    return false; // transaction processed already (could be both unconfirmed or confirmed).
                 else if (paymentChannel.transactionHashes && paymentChannel.transactionHashes.hasOwnProperty(trxHash))
-                    continue; // transaction processed already (and saved to db ;).
+                    return false; // transaction processed already (and saved to db ;).
 
                 caughtTrxs_[trxHash] = {status: "unconfirmed", time: new Date().valueOf()};
                 self.emitPaymentUpdate(backend_, paymentChannel, transactionData, paymentData, "unconfirmed");
             });
 
-            nemsocket_.subscribeWS("/transactions/" + self.getBotReadWallet(), function(message) {
+            // NEM Websocket confirmed transactions Listener
+            nemsocket_.subscribeWS("/transactions/" + paymentChannel.getRecipient(), function(message) {
                 var transactionData = JSON.parse(message.body);
                 var transaction     = transactionData.transaction;
                 var trxHash         = self.getTransactionHash(transactionData);
 
                 var paymentData = {};
-                if (false === (paymentData = paymentChannel.matchTransactionData(transaction, "confirmed")))
+                if (false === (paymentData = paymentChannel.matchTransactionData(transaction, "confirmed", true)))
                     return false;
 
                 // check if fallback caught this transaction before websocket (very unlikely)
                 if (caughtTrxs_.hasOwnProperty(trxHash) && caughtTrxs_[trxHash].status == "confirmed")
-                    continue; // transaction processed already
+                    return false; // transaction processed already
                 else if (paymentChannel.transactionHashes && paymentChannel.transactionHashes.hasOwnProperty(trxHash))
-                    continue; // transaction processed already (and saved to db ;).
+                    return false; // transaction processed already (and saved to db ;).
 
                 caughtTrxs_[trxHash] = {status: "confirmed", time: new Date().valueOf()};
                 self.emitPaymentUpdate(backend_, paymentChannel, transactionData, paymentData, "confirmed");
@@ -210,19 +215,19 @@ var PaymentProcessor = function(chainDataLayer)
      * @param  {string} status
      * @return {NEMPaymentChannel}
      */
-    this.emitPaymentUpdate = function(backendSocket, paymentChannel, transactionData, paymentData, status)
+    this.emitPaymentUpdate = function(forwardedToSocket, paymentChannel, transactionData, paymentData, status)
     {
-        var eventData = paymentData;
-        eventData.status = status;
-
-        // Websocket is ALWAYS notified of a payment status update
-        backendSocket.emit("nembot_payment_status_update", JSON.stringify(eventData));
-
         //XXX implement notifyUrl - webhooks features
+        var self    = this;
+        var trxHash = self.getTransactionHash(transactionData);
+        var meta    = transactionData.meta;
+        var content = transactionData.transaction;
+        var socket_ = forwardedToSocket;
 
+        // update the payment state in our database
         if ("confirmed" == status) {
-            paymentChannel.amountPaid += transaction.amount;
-            paymentChannel.amountUnconfirmed -= transaction.amount;
+            paymentChannel.amountPaid += content.amount;
+            paymentChannel.amountUnconfirmed -= content.amount;
             if (paymentChannel.amountUnconfirmed < 0)
                 paymentChannel.amountUnconfirmed = 0;
 
@@ -235,14 +240,21 @@ var PaymentProcessor = function(chainDataLayer)
         }
         else if ("unconfirmed" == status) {
             paymentChannel = paymentChannel.addTransaction(transactionData);
-            paymentChannel.amountUnconfirmed += transaction.amount;
+            paymentChannel.amountUnconfirmed += content.amount;
             paymentChannel.status = "identified";
-            paymentChannel.save();
         }
 
-        // update our bot database too
+        // and upon save, emit payment update the event to the Backend.
         paymentChannel = paymentChannel.addTransaction(transactionData);
-        paymentChannel.save();
+        paymentChannel.updatedAt = new Date().valueOf();
+        paymentChannel.save(function(err, paymentChannel)
+            {
+                var eventData = paymentChannel.toDict();
+
+                // notify our socket about the update (private communication NEMBot > Backend)
+                socket_.emit("nembot_payment_status_update", JSON.stringify(eventData));
+                self.blockchain_.logger().info("src/blockchain/payment-processor.js", __line, '[' + socket_.id + '] payment_status_update(' + JSON.stringify(eventData) + ')');
+            });
 
         return paymentChannel;
     }
@@ -273,5 +285,5 @@ var PaymentProcessor = function(chainDataLayer)
 };
 
 
-module.exports.service = service;
+module.exports.PaymentProcessor = PaymentProcessor;
 }());

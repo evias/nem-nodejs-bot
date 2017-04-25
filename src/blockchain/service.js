@@ -18,7 +18,8 @@
 (function() {
 
 var nemSDK = require("nem-sdk").default,
-    nemAPI = require("nem-api");
+    nemAPI = require("nem-api"),
+    NEMPaymentProcessor = require("./payment-processor.js").PaymentProcessor;
 
 /**
  * class service provide a business layer for
@@ -157,8 +158,8 @@ var service = function(config, logger)
      */
     this.getNetwork = function()
     {
-        var isTest  = conf_.nem.isTestMode;
-        var isMijin = conf_.nem.isMijin;
+        var isTest  = this.conf_.nem.isTestMode;
+        var isMijin = this.conf_.nem.isMijin;
 
         return {
             "host": this.node_.host,
@@ -173,7 +174,6 @@ var service = function(config, logger)
     this.getPaymentProcessor = function()
     {
         if (! this.paymentProcessor_) {
-            var NEMPaymentProcessor = require("payment-processor.js").PaymentProcessor;
             this.paymentProcessor_  = new NEMPaymentProcessor(this);
         }
 
