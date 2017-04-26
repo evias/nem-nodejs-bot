@@ -99,46 +99,6 @@ var NEMBotDB = function(config, io, chainDataLayer)
 
             return invoiceData;
         },
-        matchTransactionData: function(transaction, status, obligatoryMessage)
-        {
-            if (! transaction || transaction.recipient != this.recipientXEM)
-                return false;
-
-            if (transaction.type != blockchain_.nem().model.transactionTypes.transfer
-                && transaction.type != blockchain_.nem().model.transactionTypes.multisigTransaction) {
-                // we are interested only in transfer transactions
-                // and multisig transactions.
-                return false;
-            }
-
-            // try with a check of the signer's Public Key to identify the Sender.
-            var signer = transaction.signer;
-            var sender = blockchain_.nem().model.address.toAddress(signer, blockchain_.getNetwork().config.id);
-
-            var paymentData = {};
-            if (sender == this.payerXEM)
-                paymentData.sender = this.payerXEM;
-            else
-                return false;
-
-            if (obligatoryMessage === true && (!transaction.message || !transaction.message.payload))
-                return false; // missing message in incoming transaction!
-
-            if (transaction.message && transaction.message.type === 1) {
-                // message available, check if it contains the `invoiceNumber`
-                var payload = transaction.message.payload;
-                var plain   = blockchain_.nem().utils.convert.hex2a(payload);
-
-                if (plain != this.message) {
-                    return false;
-                }
-
-                paymentData.invoice = this.message;
-                return paymentData;
-            }
-
-            return obligatoryMessage !== true && paymentData.sender ? paymentData : false;
-        },
         addTransaction: function(transaction)
         {
             var meta    = transaction.meta;
@@ -171,6 +131,80 @@ var NEMBotDB = function(config, io, chainDataLayer)
             }
 
             return this;
+        }
+    };
+
+    this.NEMPaymentChannel_.statics = {
+        matchTransactionToChannel: function(transactionMetaDataPair, callback)
+        {
+            if (! transactionMetaDataPair)
+                return false;
+
+            var meta        = transactionMetaDataPair.meta;
+            var transaction = transactionMetaDataPair.transaction;
+            var recipient   = transaction.recipient;
+
+            var signer = transaction.signer;
+            var sender = blockchain_.nem().model.address.toAddress(signer, blockchain_.getNetwork().config.id);
+
+            var trxHash     = meta.hash.data;
+            if (meta.innerHash.data && meta.innerHash.data.length)
+                trxHash = meta.innerHash.data;
+
+            // first try to load the channel by transaction hash
+            var model = mongoose.model("NEMPaymentChannel");
+            model.findOne({$where: function() { return this.transactionHashes.hasOwnProperty(trxHash); }}, function(err, channel)
+            {
+                if (! err && channel) {
+                    // CHANNEL FOUND by Transaction Hash
+
+                    return callback(channel);
+                }
+                else if (! err && transaction.message && transaction.message.type === 1) {
+                    // channel not found by Transaction Hash
+                    // try to load the channel by transaction message
+
+                    // message available, build it from payload and try loading a channel.
+                    var payload = transaction.message.payload;
+                    var plain   = blockchain_.nem().utils.convert.hex2a(payload);
+
+                    model.findOne({message: plain}, function(err, channel)
+                    {
+                        if (! err && channel) {
+                            // CHANNEL FOUND by Unencrypted Message
+                            return callback(channel);
+                        }
+                        else if (! err) {
+                            // could not identify channel by Message!
+                            // try to load the channel by sender and recipient
+                            model.findOne({payerXEM: sender, recipientXEM: recipient}, function(err, channel)
+                            {
+                                if (! err && channel) {
+                                    // CHANNEL FOUND by Sender + Recipient
+                                    return callback(channel);
+                                }
+                            });
+                        }
+                    });
+                }
+                else if (! err) {
+                    // can't load by message, load by Sender + Recipient
+                    // try to load the channel by sender and recipient
+
+                    model.findOne({payerXEM: sender, recipientXEM: recipient}, function(err, channel)
+                    {
+                        if (! err && channel) {
+                            // CHANNEL FOUND by Sender + Recipient
+                            return callback(channel);
+                        }
+                    });
+                }
+            });
+        },
+
+        acknowledgeTransaction: function(channel, transactionMetaDataPair, status)
+        {
+
         }
     };
 

@@ -42,7 +42,7 @@ var NEMBot = function(config, logger, chainDataLayer)
                    + (req.connection ? req.connection.remoteAddress : "?") + " - "
                    + (req.socket ? req.socket.remoteAddress : "?") + " - "
                    + (req.connection && req.connection.socket ? req.connection.socket.remoteAddress : "?") + ")";
-        logger.info("src/server.js", __line, logMsg);
+        logger.info("NEMBot", __line, logMsg);
     };
 
     /**
@@ -207,9 +207,19 @@ var NEMBot = function(config, logger, chainDataLayer)
         var self = this,
             backends_connected_ = {};
 
+        if (self.blockchain_.isReadBot()) {
+            // Start listening to NEM Blockchain INCOMING transactions.
+            // This bot must ALWAYS listen to incoming transactions, then decide
+            // whether those are relevant or not. Additionally, when a BACKEND
+            // connects to the socket.io websocket, it will be registered in the
+            // open payment channel for the given parameters.
+
+            self.configurePaymentProcessor();
+        }
+
         io.sockets.on('connection', function(botSocket)
         {
-            logger.info("src/server.js", __line, '[' + botSocket.id + '] nembot()');
+            logger.info("NEMBot", __line, '[' + botSocket.id + '] [BOT] nembot()');
             backends_connected_[botSocket.id] = botSocket;
 
             // NEMBot "read" features:
@@ -219,7 +229,7 @@ var NEMBot = function(config, logger, chainDataLayer)
             //     - Payment Channels entries' recipientXEM field will always contain the
             //       XEM address of this NEMBot (```config.bot.read.walletAddress```).
             if (self.blockchain_.isReadBot()) {
-                self.configurePaymentChannelWebsockets(botSocket);
+                self.configurePaymentChannelWebsocket(botSocket);
             }
 
             // NEMBot "sign" features:
@@ -229,12 +239,19 @@ var NEMBot = function(config, logger, chainDataLayer)
             }
 
             botSocket.on('nembot_disconnect', function () {
-                logger.info("src/server.js", __line, '[' + botSocket.id + '] ~nembot()');
+                logger.info("NEMBot", __line, '[' + botSocket.id + '] [BOT] ~nembot()');
 
                 if (backends_connected_.hasOwnProperty(botSocket.id))
                     delete backends_connected_[botSocket.id];
             });
         });
+    };
+
+    this.configurePaymentProcesser = function()
+    {
+        this.blockchain_
+            .getPaymentProcessor()
+            .connectBlockchainSocket();
     };
 
     /**
@@ -248,7 +265,7 @@ var NEMBot = function(config, logger, chainDataLayer)
      *
      * @param  {socket.io} botSocket [description]
      */
-    this.configurePaymentChannelWebsockets = function(botSocket)
+    this.configurePaymentChannelWebsocket = function(botSocket)
     {
         var self = this;
 
@@ -258,7 +275,7 @@ var NEMBot = function(config, logger, chainDataLayer)
         {
             //XXX validate input .sender, .recipient, .message, .amount
 
-            logger.info("src/server.js", __line, '[' + botSocket.id + '] open_channel(' + channelOpts + ')');
+            logger.info("NEMBot", __line, '[' + botSocket.id + '] [BOT] open_channel(' + channelOpts + ')');
 
             var params = JSON.parse(channelOpts);
 
@@ -272,13 +289,21 @@ var NEMBot = function(config, logger, chainDataLayer)
             {
                 if (! err && paymentChannel) {
                     // channel exists - not fulfilled - re-use and LISTEN
-                    self.blockchain_.getPaymentProcessor().listenForPayment(botSocket, paymentChannel, {duration: params.maxDuration});
+
+                    // always save all socket IDs
+                    paymentChannel = paymentChannel.addSocket(botSocket);
+                    paymentChannel.save();
+
+                    self.blockchain_
+                        .getPaymentProcessor()
+                        .forwardPaymentUpdates(botSocket, paymentChannel, {duration: params.maxDuration});
                 }
                 else if (! err) {
                     // create new channel then LISTEN
                     var paymentChannel = new self.db.NEMPaymentChannel({
                         recipientXEM: params.recipient,
                         payerXEM: params.sender,
+                        socketIds: [botSocket.id],
                         message: params.message,
                         amount: params.amount,
                         amountPaid: 0,
@@ -290,11 +315,13 @@ var NEMBot = function(config, logger, chainDataLayer)
 
                     paymentChannel.save(function(err, paymentChannel)
                     {
-                        self.blockchain_.getPaymentProcessor().listenForPayment(botSocket, paymentChannel, {duration: params.maxDuration});
+                        self.blockchain_
+                            .getPaymentProcessor()
+                            .forwardPaymentUpdates(botSocket, paymentChannel, {duration: params.maxDuration});
                     });
                 }
                 else {
-                    logger.error("src/server.js", __line, "NEMPaymentChannel model Error: " + err);
+                    logger.error("NEMBot", __line, "NEMPaymentChannel model Error: " + err);
                 }
             });
         });
