@@ -42,7 +42,7 @@ var NEMBotDB = function(config, io, chainDataLayer)
         var d = new Date();
         console.log(
                 '[' + String(d).substr(0,15) + ' ' + d.toLocaleTimeString() + ']\t'
-                + "\u001b[32mINFO\u001b[0m" + '\t' + filename + '\t:' + line + '\t' + description);
+                + "\u001b[32mINFO\u001b[0m" + '\t' + filename + '\t' + description);
     };
 
     var dbError = function(filename, line, description)
@@ -119,33 +119,43 @@ var NEMBotDB = function(config, io, chainDataLayer)
 
             return invoiceData;
         },
-        addTransaction: function(transactionMetaDataPair, status)
+        addUnconfirmed: function(transactionMetaDataPair)
         {
             var meta    = transactionMetaDataPair.meta;
             var trxHash = meta.hash.data;
             if (meta.innerHash.data && meta.innerHash.data.length)
                 trxHash = meta.innerHash.data;
 
-            var dataObject = this.transactionHashes;
-            if (status == 'unconfirmed')
-                dataObject = this.unconfirmedHashes;
-
-            if (! dataObject) {
+            if (! this.unconfirmedHashes) {
                 // no transactions recorded
-                dataObject = {};
-                dataObject[trxHash] = new Date().valueOf();
+                this.unconfirmedHashes = {};
+                this.unconfirmedHashes[trxHash] = new Date().valueOf();
             }
-            else if (! dataObject.hasOwnProperty(trxHash)) {
+            else if (! this.unconfirmedHashes.hasOwnProperty(trxHash)) {
                 // this transaction is not recorded
-                dataObject[trxHash] = new Date().valueOf();
+                this.unconfirmedHashes[trxHash] = new Date().valueOf();
             }
 
-            if (status == 'unconfirmed')
-                this.unconfirmedHashes = dataObject;
-            else
-                this.transactionHashes = dataObject;
+            return this.unconfirmedHashes;
+        },
+        addTransaction: function(transactionMetaDataPair)
+        {
+            var meta    = transactionMetaDataPair.meta;
+            var trxHash = meta.hash.data;
+            if (meta.innerHash.data && meta.innerHash.data.length)
+                trxHash = meta.innerHash.data;
 
-            return this;
+            if (! this.transactionHashes) {
+                // no transactions recorded
+                this.transactionHashes = {};
+                this.transactionHashes[trxHash] = new Date().valueOf();
+            }
+            else if (! this.transactionHashes.hasOwnProperty(trxHash)) {
+                // this transaction is not recorded
+                this.transactionHashes[trxHash] = new Date().valueOf();
+            }
+
+            return this.transactionHashes;
         },
         addSocket: function(socket)
         {
@@ -165,19 +175,19 @@ var NEMBotDB = function(config, io, chainDataLayer)
         matchTransactionToChannel: function(chainDataLayer, transactionMetaDataPair, callback)
         {
             if (! transactionMetaDataPair)
-                return false;
+                return callback(false)
 
             var meta        = transactionMetaDataPair.meta;
             var transaction = transactionMetaDataPair.transaction;
 
             if (! meta || ! transaction)
-                return false;
+                return callback(false);
 
             if (transaction.type != chainDataLayer.nem().model.transactionTypes.transfer
              && transaction.type != chainDataLayer.nem().model.transactionTypes.multisigTransaction) {
                 // we are interested only in transfer transactions
                 // and multisig transactions.
-                return false;
+                return callback(false);
             }
 
             var recipient = transaction.recipient;
@@ -191,72 +201,65 @@ var NEMBotDB = function(config, io, chainDataLayer)
 
             // first try to load the channel by transaction hash
             var model = mongoose.model("NEMPaymentChannel");
-            model.findOne({hasPayment: true}, function(err, channel)
-            {
-                if (! err && channel && channel.transactionHashes.hasOwnProperty(trxHash)) {
-                    // CHANNEL FOUND by Transaction Hash
+            if (transaction.message && transaction.message.type === 1) {
+                // channel not found by Transaction Hash
+                // try to load the channel by transaction message
 
-                    return callback(channel);
-                }
-                else if (! err && transaction.message && transaction.message.type === 1) {
-                    // channel not found by Transaction Hash
-                    // try to load the channel by transaction message
+                // message available, build it from payload and try loading a channel.
+                var payload = transaction.message.payload;
+                var plain   = chainDataLayer.nem().utils.convert.hex2a(payload);
 
-                    // message available, build it from payload and try loading a channel.
-                    var payload = transaction.message.payload;
-                    var plain   = chainDataLayer.nem().utils.convert.hex2a(payload);
+                // DEBUG dbLog("[NEM] [DEBUG]", __line, "Found transaction with message '" + plain + "': " + trxHash);
 
-                    model.findOne({message: plain}, function(err, channel)
-                    {
-                        if (! err && channel) {
-                            // CHANNEL FOUND by Unencrypted Message
-                            return callback(channel);
-                        }
-                        else if (! err && !chainDataLayer.conf_.bot.read.useTransactionMessageAlways) {
-                            // could not identify channel by Message!
-                            // try to load the channel by sender and recipient
-                            model.findOne({payerXEM: sender, recipientXEM: recipient}, function(err, channel)
-                            {
-                                if (! err && channel) {
-                                    // CHANNEL FOUND by Sender + Recipient
-                                    return callback(channel);
-                                }
-                            });
-                        }
-                        else if (err) {
-                            dbError(err);
-                        }
-                    });
-                }
-                else if (! err && !chainDataLayer.conf_.bot.read.useTransactionMessageAlways) {
-                    // can't load by message, load by Sender + Recipient
-                    // try to load the channel by sender and recipient
-                    // @see bot.json : bot.read.useTransactionMessageAlways
+                model.findOne({message: plain, recipientXEM: recipient}, function(err, channel)
+                {
+                    if (! err && channel) {
+                        // CHANNEL FOUND by Unencrypted Message
+                        return callback(channel, transactionMetaDataPair);
+                    }
+                    else if (! err && !chainDataLayer.conf_.bot.read.useTransactionMessageAlways) {
+                        // could not identify channel by Message!
+                        // try to load the channel by sender and recipient
+                        model.findOne({payerXEM: sender, recipientXEM: recipient}, function(err, channel)
+                        {
+                            if (! err && channel) {
+                                // CHANNEL FOUND by Sender + Recipient
+                                return callback(channel, transactionMetaDataPair);
+                            }
+                        });
+                    }
+                    else if (err) {
+                        dbError(err);
+                    }
+                });
+            }
+            else if (!chainDataLayer.conf_.bot.read.useTransactionMessageAlways) {
+                // can't load by message, load by Sender + Recipient
+                // try to load the channel by sender and recipient
+                // @see bot.json : bot.read.useTransactionMessageAlways
 
-                    model.findOne({payerXEM: sender, recipientXEM: recipient}, function(err, channel)
-                    {
-                        if (! err && channel) {
-                            // CHANNEL FOUND by Sender + Recipient
-                            return callback(channel);
-                        }
-                        else if (err) {
-                            dbError(err);
-                        }
-                    });
-                }
-                else if (err) {
-                    dbError(err);
-                }
-            });
+                model.findOne({payerXEM: sender, recipientXEM: recipient}, function(err, channel)
+                {
+                    if (! err && channel) {
+                        // CHANNEL FOUND by Sender + Recipient
+                        return callback(channel, transactionMetaDataPair);
+                    }
+                    else if (err) {
+                        dbError(err);
+                    }
+                });
+            }
+
+            return callback(false);
         },
 
-        acknowledgeTransaction: function(channel, transactionMetaDataPair, status)
+        acknowledgeTransaction: function(channel, transactionMetaDataPair, status, callback)
         {
             var meta        = transactionMetaDataPair.meta;
             var transaction = transactionMetaDataPair.transaction;
 
             if (! meta || ! transaction)
-                return false;
+                return callback(false);
 
             var trxHash     = meta.hash.data;
             if (meta.innerHash.data && meta.innerHash.data.length)
@@ -267,7 +270,7 @@ var NEMBotDB = function(config, io, chainDataLayer)
             if (trxes && Object.getOwnPropertyNames(trxes).length && trxes.hasOwnProperty(trxHash)) {
                 // transaction already processed in this status. (whether in unconfirmedHashes or transactionHashes
                 // is changed with the ```status``` variable)
-                return false;
+                return callback(false);
             }
 
             // now "acknowledging" transaction: this means we will save the transaction amount
@@ -292,18 +295,23 @@ var NEMBotDB = function(config, io, chainDataLayer)
                     channel.isPaid = true;
                     channel.paidAt = new Date().valueOf();
                 }
+
+                channel.transactionHashes = channel.addTransaction(transactionMetaDataPair);
+                channel.hasPayment = true;
             }
             else if ("unconfirmed" == status) {
                 channel.amountUnconfirmed += transaction.amount;
                 channel.status = "identified";
+
+                channel.unconfirmedHashes = channel.addUnconfirmed(transactionMetaDataPair);
             }
 
             // and upon save, emit payment status update event to the Backend.
-            channel = channel.addTransaction(transactionMetaDataPair, status);
             channel.updatedAt = new Date().valueOf();
-            channel.save();
-
-            return channel;
+            channel.save(function(err, channel)
+            {
+                return callback(channel);
+            });
         }
     };
 

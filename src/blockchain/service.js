@@ -37,6 +37,7 @@ var service = function(config, logger)
     this.conf_ = config;
     this.logger_ = logger;
     this.db_ = null;
+    this.cliSocketIo_ = null;
 
     this.isTestMode = config.nem.isTestMode;
     this.envSuffix  = this.isTestMode ? "_TEST" : "";
@@ -181,6 +182,17 @@ var service = function(config, logger)
     this.getDatabaseAdapter = function()
     {
         return this.db_;
+    };
+
+    this.setCliSocketIo = function(cliSocketIo)
+    {
+        this.cliSocketIo_ = cliSocketIo;
+        return this;
+    };
+
+    this.getCliSocketIo = function()
+    {
+        return this.cliSocketIo_;
     };
 
     this.getPaymentProcessor = function()

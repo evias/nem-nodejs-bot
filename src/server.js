@@ -36,6 +36,7 @@ var NEMBot = function(config, logger, chainDataLayer)
     this.db        = new models.NEMBotDB(config, io, chainDataLayer);
 
     this.blockchain_.setDatabaseAdapter(this.db);
+    this.blockchain_.setCliSocketIo(io);
 
     // define a helper for development debug of requests
     this.serverLog = function(req, msg, type)
@@ -221,7 +222,7 @@ var NEMBot = function(config, logger, chainDataLayer)
 
         io.sockets.on('connection', function(botSocket)
         {
-            logger.info("NEMBot", __line, '[' + botSocket.id + '] [BOT] nembot()');
+            logger.info("[BOT] [" + botSocket.id + "]", __line, 'nembot()');
             backends_connected_[botSocket.id] = botSocket;
 
             // NEMBot "read" features:
@@ -241,7 +242,7 @@ var NEMBot = function(config, logger, chainDataLayer)
             }
 
             botSocket.on('nembot_disconnect', function () {
-                logger.info("NEMBot", __line, '[' + botSocket.id + '] [BOT] ~nembot()');
+                logger.info("[BOT] [" + botSocket.id + "]", __line, '~nembot()');
 
                 if (backends_connected_.hasOwnProperty(botSocket.id))
                     delete backends_connected_[botSocket.id];
@@ -277,7 +278,7 @@ var NEMBot = function(config, logger, chainDataLayer)
         {
             //XXX validate input .sender, .recipient, .message, .amount
 
-            logger.info("NEMBot", __line, '[' + botSocket.id + '] [BOT] open_channel(' + channelOpts + ')');
+            logger.info("[BOT] [" + botSocket.id + "]", __line, 'open_channel(' + channelOpts + ')');
 
             var params = JSON.parse(channelOpts);
 
@@ -294,11 +295,12 @@ var NEMBot = function(config, logger, chainDataLayer)
 
                     // always save all socket IDs
                     paymentChannel = paymentChannel.addSocket(botSocket);
-                    paymentChannel.save();
-
-                    self.blockchain_
-                        .getPaymentProcessor()
-                        .forwardPaymentUpdates(botSocket, paymentChannel, {duration: params.maxDuration});
+                    paymentChannel.save(function(err, channel)
+                        {
+                            self.blockchain_
+                                .getPaymentProcessor()
+                                .forwardPaymentUpdates(botSocket, channel, {duration: params.maxDuration});
+                        });
                 }
                 else if (! err) {
                     // create new channel then LISTEN
@@ -323,7 +325,7 @@ var NEMBot = function(config, logger, chainDataLayer)
                     });
                 }
                 else {
-                    logger.error("NEMBot", __line, "NEMPaymentChannel model Error: " + err);
+                    logger.error("[BOT] [" + botSocket.id + "]", __line, "NEMPaymentChannel model Error: " + err);
                 }
             });
         });
