@@ -4,7 +4,8 @@
         "name": "NEMBot eVias #1",
         "read": {
             "walletAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
-            "duration": 300000
+            "duration": 300000,
+            "useTransactionMessageAlways": true
         },
         "sign": {
             "multisigAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",

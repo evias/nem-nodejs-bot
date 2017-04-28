@@ -35,6 +35,8 @@ var NEMBot = function(config, logger, chainDataLayer)
 
     this.db        = new models.NEMBotDB(config, io, chainDataLayer);
 
+    this.blockchain_.setDatabaseAdapter(this.db);
+
     // define a helper for development debug of requests
     this.serverLog = function(req, msg, type)
     {
@@ -247,7 +249,7 @@ var NEMBot = function(config, logger, chainDataLayer)
         });
     };
 
-    this.configurePaymentProcesser = function()
+    this.configurePaymentProcessor = function()
     {
         this.blockchain_
             .getPaymentProcessor()

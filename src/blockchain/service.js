@@ -36,6 +36,7 @@ var service = function(config, logger)
     this.nem_  = nemSDK;
     this.conf_ = config;
     this.logger_ = logger;
+    this.db_ = null;
 
     this.isTestMode = config.nem.isTestMode;
     this.envSuffix  = this.isTestMode ? "_TEST" : "";
@@ -171,10 +172,21 @@ var service = function(config, logger)
         };
     };
 
+    this.setDatabaseAdapter = function(db)
+    {
+        this.db_ = db;
+        return this;
+    };
+
+    this.getDatabaseAdapter = function()
+    {
+        return this.db_;
+    };
+
     this.getPaymentProcessor = function()
     {
         if (! this.paymentProcessor_) {
-            this.paymentProcessor_  = new NEMPaymentProcessor(this);
+            this.paymentProcessor_ = new NEMPaymentProcessor(this);
         }
 
         return this.paymentProcessor_;
