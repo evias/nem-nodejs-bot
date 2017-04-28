@@ -19,7 +19,7 @@
 
 var nemSDK = require("nem-sdk").default,
     nemAPI = require("nem-api"),
-    PaymentChannel = require("./payment-channel.js").PaymentChannel;
+    NEMPaymentProcessor = require("./payment-processor.js").PaymentProcessor;
 
 /**
  * class service provide a business layer for
@@ -33,55 +33,123 @@ var service = function(config, logger)
     // the NEM blockchain. This will create the endpoint for the given
     // network and port (testnet, mainnet, mijin) and will then initialize
     // a common object using the configured private key.
-    var nem_  = nemSDK;
-    var api_  = nemAPI;
-    var conf_ = config;
-    var logger_ = logger;
+    this.nem_  = nemSDK;
+    this.conf_ = config;
+    this.logger_ = logger;
+    this.db_ = null;
+    this.cliSocketIo_ = null;
 
-    var isTestMode = config.nem.isTestMode;
-    var envSuffix  = isTestMode ? "_TEST" : "";
-    var confSuffix = isTestMode ? "_test" : "";
+    this.isTestMode = config.nem.isTestMode;
+    this.envSuffix  = this.isTestMode ? "_TEST" : "";
+    this.confSuffix = this.isTestMode ? "_test" : "";
 
     // connect to the blockchain with the NEM SDK
-    var nemHost = process.env["NEM_HOST" + envSuffix] || conf_.nem["nodes" + confSuffix][0].host;
-    var nemPort = process.env["NEM_PORT" + envSuffix] || conf_.nem["nodes" + confSuffix][0].port;
-    var node_   = nem_.model.objects.create("endpoint")(nemHost, nemPort);
+    this.nemHost = process.env["NEM_HOST" + this.envSuffix] || this.conf_.nem["nodes" + this.confSuffix][0].host;
+    this.nemPort = process.env["NEM_PORT" + this.envSuffix] || this.conf_.nem["nodes" + this.confSuffix][0].port;
+    this.node_   = this.nem_.model.objects.create("endpoint")(this.nemHost, this.nemPort);
 
     // following is our bot's XEM wallet address
-    var botWallet_ = (process.env["BOT_WALLET"] || conf_.bot.walletAddress).replace(/-/g, "");
+    this.botMode_ = process.env["BOT_MODE"] || this.conf_.bot.mode;
+    this.botReadWallet_ = (process.env["BOT_READ_WALLET"] || this.conf_.bot.read.walletAddress).replace(/-/g, "");
+    this.botSignWallet_ = (process.env["BOT_SIGN_WALLET"] || this.conf_.bot.sign.walletAddress).replace(/-/g, "");
+    this.botTipperWallet_ = (process.env["BOT_TIPPER_WALLET"] || this.conf_.bot.tipper.walletAddress).replace(/-/g, "");
+
+    this.paymentProcessor_ = undefined;
 
     // define a helper for development debug of websocket
     this.socketLog = function(msg, type)
     {
         var logMsg = "[" + type + "] " + msg;
-        logger_.info("src/blockchain/service.js", __line, logMsg);
+        this.logger_.info("src/blockchain/service.js", __line, logMsg);
     };
 
     // define a helper for ERROR of websocket
     this.socketError = function(msg, type)
     {
         var logMsg = "[" + type + "] " + msg;
-        logger_.error("src/blockchain/service.js", __line, logMsg);
+        this.logger_.error("src/blockchain/service.js", __line, logMsg);
     };
 
     this.nem = function()
     {
-        return nem_;
+        return this.nem_;
+    };
+
+    this.endpoint = function()
+    {
+        return this.node_;
     };
 
     this.logger = function()
     {
-        return logger_;
+        return this.logger_;
+    };
+
+    this.isMode = function(mode)
+    {
+        if (typeof this.conf_.bot.mode == "string")
+            return this.conf_.bot.mode == mode || this.conf_.bot.mode == "all";
+
+        for (var i in this.conf_.bot.mode) {
+            var current = this.conf_.bot.mode[i];
+            if (mode == current || "all" == current)
+                return true;
+        }
+
+        return false;
+    };
+
+    this.isReadBot = function()
+    {
+        return this.isMode("read");
+    };
+
+    this.isSignBot = function()
+    {
+        return this.isMode("sign");
+    };
+
+    this.isTipperBot = function()
+    {
+        return this.isMode("tip");
     };
 
     /**
-     * Get this bot's Wallet Address
+     * Get this bot's READ Wallet Address
+     *
+     * This is the address for which the bot will listen to transactions.
      *
      * @return string   XEM account address for the Bot
      */
-    this.getBotWallet = function()
+    this.getBotReadWallet = function()
     {
-        return botWallet_;
+        return this.botReadWallet_;
+    };
+
+    /**
+     * Get this bot's SIGNING Wallet Address
+     *
+     * This is the wallet used for Co-Signing Multi Signature Transactions,
+     * the privateKey must be set for this feature to work.
+     *
+     * @return string   XEM account address for the Bot
+     */
+    this.getBotSignWallet = function()
+    {
+        return this.botReadWallet_;
+    };
+
+    /**
+     * Get this bot's TIPPER Wallet Address
+     *
+     * This is the wallet used for Tipper Bot features,
+     * the privateKey must be set for this feature to work.
+     *
+     * @return string   XEM account address for the Bot
+     */
+    this.getBotTipperWallet = function()
+    {
+        return this.botTipperWallet_;
     };
 
     /**
@@ -92,91 +160,48 @@ var service = function(config, logger)
      */
     this.getNetwork = function()
     {
-        var isTest  = conf_.nem.isTestMode;
-        var isMijin = conf_.nem.isMijin;
+        var isTest  = this.conf_.nem.isTestMode;
+        var isMijin = this.conf_.nem.isMijin;
 
         return {
-            "host": node_.host,
-            "port": node_.port,
+            "host": this.node_.host,
+            "port": this.node_.port,
             "label": isTest ? "Testnet" : isMijin ? "Mijin" : "Mainnet",
-            "config": isTest ? nem_.model.network.data.testnet : isMijin ? nem_.model.network.data.mijin : nem_.model.network.data.mainnet,
+            "config": isTest ? this.nem_.model.network.data.testnet : isMijin ? this.nem_.model.network.data.mijin : this.nem_.model.network.data.mainnet,
             "isTest": isTest,
             "isMijin": isMijin
         };
     };
 
-    this.openPaymentChannel = function(backendSocket, options, channelData)
+    this.setDatabaseAdapter = function(db)
     {
-        var self = this;
+        this.db_ = db;
+        return this;
+    };
 
-        var backend_   = backendSocket;
-        var websocket_ = new api_(nemHost + ":" + nemPort);
-        var options_   = channelData || options;
-        var invoiceNumber_ = channelData.message || options.message || "";
-        var invoiceSender_  = channelData.sender ||  options.sender;
-        var invoiceRecipient_ = channelData.recipient || options.recipient || self.getBotWallet();
+    this.getDatabaseAdapter = function()
+    {
+        return this.db_;
+    };
 
-        // open new payment channel
-        var paymentChannel = new PaymentChannel(self, backendSocket, channelData);
+    this.setCliSocketIo = function(cliSocketIo)
+    {
+        this.cliSocketIo_ = cliSocketIo;
+        return this;
+    };
 
-        // define helper for websocket error handling
-        var websocketErrorHandler = function(error)
-        {
-            var regexp_LostConn = new RegExp(/Lost connection to/);
-            if (regexp_LostConn.test(error)) {
-                // need to reconnect
-                self.socketLog("Connection lost, re-connecting..", "DROP");
-                self.openPaymentChannel(backend_, options_, channelData);
-                return false;
-            }
+    this.getCliSocketIo = function()
+    {
+        return this.cliSocketIo_;
+    };
 
-            // uncaught error happened
-            self.socketError("Websocket Uncaught Error: " + error, "UNCAUGHT");
-        };
+    this.getPaymentProcessor = function()
+    {
+        if (! this.paymentProcessor_) {
+            this.paymentProcessor_ = new NEMPaymentProcessor(this);
+        }
 
-        websocket_.connectWS(function()
-            {
-                // on connection we subscribe to the needed NEM blockchain websocket channels.
-
-                websocket_.subscribeWS("/errors", function(message) {
-                    self.socketError(message.body, "ERROR");
-                });
-
-                websocket_.subscribeWS("/unconfirmed/" + self.getBotWallet(), function(message) {
-
-                    var transactionData = JSON.parse(message.body);
-                    var transaction     = transactionData.transaction;
-
-                    if (! transaction || transaction.recipient != self.getBotWallet())
-                        return false;
-
-                    var paymentData = {};
-                    if (false === (paymentData = paymentChannel.extractPaymentData(transaction, "amountUnconfirmed")))
-                        return false;
-
-                    paymentChannel.sendPaymentStatusUpdate(paymentData, "unconfirmed");
-                });
-
-                websocket_.subscribeWS("/transactions/" + self.getBotWallet(), function(message) {
-                    var transactionData = JSON.parse(message.body);
-                    var transaction     = transactionData.transaction;
-
-                    if (! transaction || transaction.recipient != self.getBotWallet())
-                        return false;
-
-                    var paymentData = {};
-                    if (false === (paymentData = paymentChannel.extractPaymentData(transaction, "amountPaid")))
-                        return false;
-
-                    paymentChannel.sendPaymentStatusUpdate(paymentData, "confirmed");
-
-                    if (paymentChannel.isPaid())
-                        paymentChannel.finish();
-                });
-
-            }, websocketErrorHandler);
-
-        return paymentChannel;
+        return this.paymentProcessor_;
     };
 
     var self = this;

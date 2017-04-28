@@ -5,16 +5,20 @@ This is a multi feature Bot written in Node.js for the NEM blockchain. This bot 
 or serving locally.
 
 Main features of this bot include listening to account transactions income or account data modifications and cosigning
-multi signature accounts transactions.
+multi signature accounts transactions. The NEMBot aims to be hidden such that Websites using the Bot to get Payment
+Updates, never **directly** communicate with the Bot. This helps secure the Signing features but also gives more Privacy
+to any company which wishes to use the NEMBot to Listen to Incoming Transaction (example of NEMPay).
 
 Socket.io is used to Proxy the Communication between the NEMBot and your Node.js express app. This is to avoid addressing
 your NEMBot over HTTP or Websocket **directly**(traceable in the Network Console). I decided to implement a Proxying mechanism
 using Socket.io that will be placed between the Frontend and the Bot such that **even reading** is kept private.
 
 The multisignature co-signing features will not be using any other Communication protocol than the Blockchain itself! This is
-possible with the Multi Signature Account Push Notification System right in the NEM blockchain core.
+possible with the Multi Signature Account Push Notification System right in the NEM blockchain core. Communicating only through
+the NEM Blockchain is a security feature that will help not disclose the NEMBot(s) used for co-signing.
 
-The NEMBot also provides a HTTP/JSON API for which the endpoints will be listed in this document.
+The NEMBot also provides a HTTP/JSON API for which the endpoints will be listed in this document. The HTTP/JSON API should only
+provide with a READ API such that the database of the NEMBot(s) can be read.
 
 Dependencies
 ------------
@@ -23,18 +27,21 @@ This package uses the ```nem-sdk``` package and the ```nem-api``` package as a s
 can be used to perform any kind of HTTP request to the blockchain API, while ```nem-api``` supports both HTTP requests
 and Websockets (which we will use).
 
+This project will implement a mix of both libraries. First, the nem-api package is used to connect to the Blockchain using
+Websockets and the nem-sdk library is used as a second layer of security whenever websockets process relevant data.
+
 Installation
 ------------
 
 The bot can be configured to execute any of the following features:
- - Payment Channel Listening (Read permission)
- - Balance Modifications Listening (Read permission)
- - Cosignatory Auditing (Read permission)
- - Multi Signature Transaction Co-Signing (Write permission)
- - Tip Bots (HTTP/JSON API)
+ - Payment Channel Listening (mode **read**)
+ - Balance Modifications Listening  (mode **read**)
+ - Cosignatory Auditing (mode **read**)
+ - Multi Signature Transaction Co-Signing (mode **sign**)
+ - Tip Bots (HTTP/JSON API) (mode **tip**)
 
-Only WRITE features need your Private Key, change the "mode" config to "read" or "write" or "both" to enable/disable read and write.
-This allows deploying read-only bots which don't need your Private Key and can be addressed through an easy HTTP API and Websockets.
+Only SIGN and TIP features need your Private Key, change the "mode" config to "read" or "sign" or "tip" or "all" to enable/disable read and write.
+You can also use an array for configuring the bot to use ["read", "tip"] features for example. The tipper bot features also need a Private Key.
 
 For a local installation, first install the dependencies of this package. Using the terminal works as follows:
 ```
@@ -49,10 +56,46 @@ After configuration, you can start the Bot, locally this would be:
     $ npm run_bot.js
 ```
 
-Your bot is now running on localhost! The API is published on port 29081 by default.
+Your bot is now running on localhost! The **API** is published on **port 29081** by default.
 
 The config/bot.json file will only be removed in "production" mode. The environment is defined by the **APP_ENV** environment variables and
 default to **development**.
+
+Configuration
+-------------
+
+The ```config/bot.json``` configuration file contains all configuration for the NEMBot. Following are details for each of the field in this
+configuration field:
+
+```
+    - bot.mode : Type: text. Possible values: "read", "sign", "tip", "all". Defines the Type of Bot.
+    - bot.name : Type: text. Labelling for your NEMBot.
+    - bot.protectedAPI : Type: boolean. Whether to enable HTTP Basic Auth (true) or not (false).
+    - bot.db.uri : Type: text. MongoDB URI, only used if MONGODB_URI and MONGOLAB_URI env variables are not provided (non-heroku).
+
+    Payment Processing
+    -------------------
+    - bot.read.walletAddress : Type: text. XEM Address of the Account for which the Bot should Listen to Payments.
+    - bot.read.duration : Type: integer. Default Payment Channel duration (5 minutes) - expressed in Milliseconds.
+
+    MultiSig Co-Signing
+    -------------------
+    - bot.sign.multisigAddress : Type: text. XEM Address of the Multi Signature Account of which this Bot is a Co-Signatory.
+    - bot.sign.walletAddress : Type: text. XEM Address of the Account to **use** for Co-Signing Multi Signature Transactions.
+    - bot.sign.privateKey : Type: text. Private Key of the Account to **use** for Co-Signing Multi Signature Transactions. (Should be the Private Key of the Account ```bot.sign.walletAddress```).
+
+    Tipper Features
+    ---------------
+    - bot.tipper.walletAddress : Type: text. XEM Address of the Account to use for Tipping. (Sending money in demande of tippers)
+    - bot.tipper.privateKey : Type: text. Private Key of the Account to use for Tipping. (Should be the Private Key of the Account ```bot.tipper.walletAddress```)
+
+    NEM Blockchain Configuration
+    ----------------------------
+    - nem.isTestMode : Type: boolean. Whether to work with the Testnet Blockchain (true) or the Mainnet Blockchain (false).
+    - nem.isMijin : Type: boolean. Whether we are using Mijin Network (true) or not (false).
+    - nem.nodes[x]: Type: object. Configure Mainnet default Blockchain Nodes.
+    - nem.nodes_test[x]: Type: object. Configure Testnet default Blockchain Nodes.
+```
 
 Deploy on Heroku
 ----------------
@@ -63,7 +106,7 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
 ```
     - Required:
         - APP_ENV : Environment of your NEMBot. Can be either production or development.
-        - ENCRYPT_PASS : Should contain the configuration file encryption password.
+        - ENCRYPT_PASS : Should contain the configuration file encryption password. (if not set, will ask in terminal)
         - PORT : Should contain the Port on which the Bot HTTP/JSON API & Websockets will be addressed.
 
     - Optional :
@@ -91,6 +134,7 @@ Usage Examples
 --------------
 
 This example implements following Flow:
+
     - FRONTEND creates an invoice for someone to pay something
     - BACKEND opens a payment channel with NEMBot to observe incoming transactions
     - NEMBot informs the BACKEND of payment status updates (when there is some)
@@ -99,7 +143,13 @@ This example implements following Flow:
 This can be understood as follows:
 
 ```
-    jQuery > Node.js > NEMBot > NEM Blockchain > NEMBot > Node.js > jQuery
+    Frontend  >   Backend >   NEMBot ->|
+                                       |
+                             ---------------------
+                             | NEM Blockchain    |
+                             ---------------------
+                                       |
+    Frontend  <   Backend <   NEMBot <-|
 ```
 
 So lets define the details about this scenario. Your BACKEND will use socket.io to send events
@@ -124,6 +174,23 @@ io.sockets.on('connection', function(socket)
         if (frontends_connected_.hasOwnProperty(socket.id))
             delete frontends_connected_[socket.id];
     });
+});
+
+// example is GET /create-invoice?client=XXX_sfwe2
+expressApp.get("/create-invoice", function(req, res)
+{
+    var clientSocketId = req.query.client ? req.query.client : null;
+    if (! clientSocketId || ! clientSocketId.length)
+        res.send(JSON.stringify({"status": "error", "message": "Mandatory field `Client Socket ID` is invalid."}));
+
+    // do your DB work ..
+
+    // now start a payment channel with the bot.
+    startPaymentChannel(clientSocketId, function(invoiceSocket)
+        {
+            // payment channel is now open, we can end the create-invoice response.
+            res.send({"status": "ok"}, 200);
+        });
 });
 
 var startPaymentChannel = function(clientSocketId, callback)
@@ -156,23 +223,6 @@ var startPaymentChannel = function(clientSocketId, callback)
 
         callback(invoiceSocket);
     };
-
-// example is GET /create-invoice?client=XXX_sfwe2
-expressApp.get("/create-invoice", function(req, res)
-{
-    var clientSocketId = req.query.client ? req.query.client : null;
-    if (! clientSocketId || ! clientSocketId.length)
-        res.send(JSON.stringify({"status": "error", "message": "Mandatory field `Client Socket ID` is invalid."}));
-
-    // do your DB work ..
-
-    // now start a payment channel with the bot.
-    startPaymentChannel(clientSocketId, function(invoiceSocket)
-        {
-            // payment channel is now open, we can end the create-invoice response.
-            res.send({"status": "ok"}, 200);
-        });
-});
 ```
 
 ```
@@ -201,7 +251,7 @@ Pot de vin
 
 If you like the initiative, and for the sake of good mood, I recommend you take a few minutes to Donate a beer or Three [because belgians like that] by sending some XEM (or whatever Mosaic you think pays me a few beers someday!) to my Wallet:
 ```
-    NB72EM6TTSX72O47T3GQFL345AB5WYKIDODKPPYW
+    NCK34K5LIXL4OMPDLVGPTWPZMGFTDRZQEBRS5Q2S
 ```
 
 License

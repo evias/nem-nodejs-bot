@@ -90,7 +90,7 @@ var startBot = function(pass)
 				}
 			}
 			catch (e) {
-				logger.error(__smartfilename, __line, "Error with NEM Bot configuration. Invalid encryption password!");
+				logger.error(__smartfilename, __line, "Error with NEM Bot configuration. Invalid encryption password: " + e);
 				logger.warn(__smartfilename, __line, "NEM Bot now aborting.");
 			}
 		}
@@ -112,7 +112,7 @@ if (typeof pass == 'undefined' || ! pass.length) {
 	if (! fs.existsSync("config/bot.json.enc")) {
 		// encrypted configuration file not yet created
 
-		console.log("Please enter a password for Encryption: ");
+		console.log("Please enter a password for your NEMBot (and save it somewhere safe): ");
 		pw(function(password) {
 			encryptConfig(password);
 			startBot(password);
@@ -121,7 +121,7 @@ if (typeof pass == 'undefined' || ! pass.length) {
 	else {
 		// encrypted file exists, ask password for decryption
 
-		console.log("Please enter your password: ");
+		console.log("Please enter your NEMBot's password: ");
 		pw(function(password) {
 			startBot(password);
 		});
