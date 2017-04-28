@@ -39,4 +39,4 @@ jspm_packages
 # nem-nodejs-bot specific Rules
 config/bot.json.enc
 nem-bot.htpasswd
-db/
+db/*.json
