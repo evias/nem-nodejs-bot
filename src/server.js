@@ -220,6 +220,14 @@ var NEMBot = function(config, logger, chainDataLayer)
             self.configurePaymentProcessor();
         }
 
+        if (self.blockchain_.isSignBot()) {
+            // Start listening to NEM Blockchain UNCONFIRMED transactions.
+            // This bot must ALWAYS listen to unconfirmed transactions, then decide
+            // whether those are relevant FOR SIGNING or not.
+
+            self.configurePaymentSigner();
+        }
+
         io.sockets.on('connection', function(botSocket)
         {
             logger.info("[BOT] [" + botSocket.id + "]", __line, 'nembot()');
@@ -255,6 +263,12 @@ var NEMBot = function(config, logger, chainDataLayer)
         this.blockchain_
             .getPaymentProcessor()
             .connectBlockchainSocket();
+    };
+
+    this.configurePaymentSigner = function()
+    {
+        this.blockchain_
+            .getPaymentSigner();
     };
 
     /**
