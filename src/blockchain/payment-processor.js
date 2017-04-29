@@ -47,6 +47,8 @@ var PaymentProcessor = function(chainDataLayer)
     this.caughtTrxs_= null;
     this.nemsocket_ = new api_(this.blockchain_.nemHost + ":" + this.blockchain_.nemPort);
     this.socketById = {};
+    this.nemConnection_ = null;
+    this.nemSubscriptions_ = {};
 
     this.options_ = {
         mandatoryMessage: true
@@ -163,7 +165,7 @@ var PaymentProcessor = function(chainDataLayer)
         };
 
         // Connect to NEM Blockchain Websocket now
-        self.nemsocket_.connectWS(function()
+        self.nemConnection_ = self.nemsocket_.connectWS(function()
         {
             // on connection we subscribe only to the /errors websocket.
             // PaymentProcessor will open
@@ -174,26 +176,33 @@ var PaymentProcessor = function(chainDataLayer)
 
             // NEM Websocket Error listening
             self.logger().info("[NEM] [SOCKET]", __line, 'subscribing to /errors.');
-            self.nemsocket_.subscribeWS("/errors", function(message)
+            self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message)
             {
                 self.logger()
                     .error("[NEM] [ERROR] [SOCKET]", __line,
                           "Error Happened: " + message.body);
             });
 
-            //XXX NEM Websocket new blocks Listener => Should verify confirmations about our payment channels.
-            self.nemsocket_.subscribeWS("/blocks/new", function(message) {
-                self.logger().info("[NEM] [SOCKET]", __line, 'new_block(' + message.body + ')');
+            // NEM Websocket new blocks Listener
+            self.nemSubscriptions_["/blocks/new"] = self.nemsocket_.subscribeWS("/blocks/new", function(message)
+            {
+                var parsed = JSON.parse(message.body);
+                self.logger().info("[NEM] [SOCKET]", __line, 'new_block(' + JSON.stringify(parsed) + ')');
 
                 // new blocks means we might have new transactions to process !
                 websocketFallbackHandler(self);
             });
 
+            var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotReadWallet();
+            var confirmedUri   = "/transactions/" + self.blockchain_.getBotReadWallet();
+            var sendUri        = "/w/api/account/transfers/all";
+
             // NEM Websocket unconfirmed transactions Listener
             self.logger().info("[NEM] [SOCKET]", __line, 'subscribing to /unconfirmed/' + self.blockchain_.getBotReadWallet() + '.');
-            self.nemsocket_.subscribeWS("/unconfirmed/" + self.blockchain_.getBotReadWallet(), function(message)
+            self.nemSubscriptions_[unconfirmedUri] = self.nemsocket_.subscribeWS(unconfirmedUri, function(message)
             {
-                self.logger().info("[NEM] [SOCKET]", __line, 'unconfirmed(' + message.body + ')');
+                var parsed = JSON.parse(message.body);
+                self.logger().info("[NEM] [SOCKET]", __line, 'unconfirmed(' + JSON.stringify(parsed) + ')');
 
                 var transactionData = JSON.parse(message.body);
                 var transaction     = transactionData.transaction;
@@ -209,9 +218,10 @@ var PaymentProcessor = function(chainDataLayer)
 
             // NEM Websocket confirmed transactions Listener
             self.logger().info("[NEM] [SOCKET]", __line, 'subscribing to /transactions/' + self.blockchain_.getBotReadWallet() + '.');
-            self.nemsocket_.subscribeWS("/transactions/" + self.blockchain_.getBotReadWallet(), function(message)
+            self.nemSubscriptions_[confirmedUri] = self.nemsocket_.subscribeWS(confirmedUri, function(message)
             {
-                self.logger().info("[NEM] [SOCKET]", __line, 'transactions(' + message.body + ')');
+                var parsed = JSON.parse(message.body);
+                self.logger().info("[NEM] [SOCKET]", __line, 'transactions(' + JSON.stringify(parsed) + ')');
 
                 var transactionData = JSON.parse(message.body);
                 var transaction     = transactionData.transaction;
@@ -225,21 +235,22 @@ var PaymentProcessor = function(chainDataLayer)
                     });
             });
 
+            self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotReadWallet() }));
+
         }, websocketErrorHandler);
 
         return self.nemsocket_;
     };
 
     /**
-     * This method OPENS a payment channel for the given backendSocket. Data about the payer
-     * and the recipient are store in the `paymentChannel` model instance. The `params` field
-     * can be used to provide a `duration` in milliseconds.
+     * This method adds a new backend Socket to the current available Socket.IO
+     * client instances. This is used to forward payment status updates event
+     * back to the Backend which will then forward it to the Frontend Application
+     * or Game.
      *
-     * This process will open a NEM Websocket Connection (Bot > NEM) handling payment updates and forwarding
-     * them back to the `backendSocket` Websocket (Bot > Backend).
-     *
-     * A fallback for Websockets will be implemented with HTTP requests using the nem-sdk library because
-     * it seems Websockets sometimes don't catch some transactions. (bug reported in NanoWallet already)
+     * This method also opens a FALLBACK HTTP/JSON NIS API handler to query the
+     * blockchain every minute for new transactions that might be relevant to our
+     * application or game.
      *
      * @param  {object} backendSocket
      * @param  {NEMPaymentChannel} paymentChannel
@@ -269,20 +280,20 @@ var PaymentProcessor = function(chainDataLayer)
         // to the Blockchain Sockets so here we only need to provide with a Fallback for this
         // particular payment channel otherwize it would get very traffic intensive.
 
-        // fallback handler queries the blockchain every 20 seconds
+        // fallback handler queries the blockchain every 120 seconds
         var fallbackInterval = setInterval(function()
         {
             websocketFallbackHandler(self);
-        }, 30 * 1000);
+        }, 120 * 1000);
 
         setTimeout(function() {
             clearInterval(fallbackInterval);
 
             // closing fallback communication channel, update one more time.
             websocketFallbackHandler(self);
-        }, duration_);
+        }, (duration_ + (60 * 1000)));
 
-        // check balance now - do not wait 30 seconds
+        // check payment state now - do not wait 30 seconds
         websocketFallbackHandler(self);
     };
 

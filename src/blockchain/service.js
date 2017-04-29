@@ -204,6 +204,15 @@ var service = function(config, logger)
         return this.paymentProcessor_;
     };
 
+    this.getPaymentSigner = function()
+    {
+        if (! this.paymentSigner_) {
+            //XXXthis.paymentSigner_ = new NEMPaymentSigner(this);
+        }
+
+        return null; //XXX this.paymentSigner_;
+    };
+
     var self = this;
     {
         // nothing more done on instanciation

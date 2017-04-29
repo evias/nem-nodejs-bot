@@ -1,6 +1,6 @@
 {
     "bot": {
-        "mode": "read",
+        "mode": ["read", "sign"],
         "name": "NEMBot eVias #1",
         "read": {
             "walletAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
