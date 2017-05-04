@@ -19,7 +19,8 @@
 
 var nemSDK = require("nem-sdk").default,
     nemAPI = require("nem-api"),
-    NEMPaymentProcessor = require("./payment-processor.js").PaymentProcessor;
+    PaymentProcessor = require("./payment-processor.js").PaymentProcessor,
+    MultisigCosignatory = require("./multisig-cosignatory.js").MultisigCosignatory;
 
 /**
  * class service provide a business layer for
@@ -50,11 +51,13 @@ var service = function(config, logger)
 
     // following is our bot's XEM wallet address
     this.botMode_ = process.env["BOT_MODE"] || this.conf_.bot.mode;
-    this.botReadWallet_ = (process.env["BOT_READ_WALLET"] || this.conf_.bot.read.walletAddress).replace(/-/g, "");
-    this.botSignWallet_ = (process.env["BOT_SIGN_WALLET"] || this.conf_.bot.sign.walletAddress).replace(/-/g, "");
+    this.botReadWallet_   = (process.env["BOT_READ_WALLET"] || this.conf_.bot.read.walletAddress).replace(/-/g, "");
+    this.botSignMultisig_ = (process.env["BOT_MULTISIG_WALLET"] || this.conf_.bot.sign.multisigAddress).replace(/-/g, "");
+    this.botSignWallet_   = (process.env["BOT_SIGN_WALLET"] || this.conf_.bot.sign.cosignatory.walletAddress).replace(/-/g, "");
     this.botTipperWallet_ = (process.env["BOT_TIPPER_WALLET"] || this.conf_.bot.tipper.walletAddress).replace(/-/g, "");
 
-    this.paymentProcessor_ = undefined;
+    this.paymentProcessor_    = undefined;
+    this.multisigCosignatory_ = undefined;
 
     // define a helper for development debug of websocket
     this.socketLog = function(msg, type)
@@ -140,6 +143,18 @@ var service = function(config, logger)
     };
 
     /**
+     * Get this bot's Multi Signature Wallet Address
+     *
+     * This is the Multi Signature account holding funds.
+     *
+     * @return string   XEM account address for the Bot
+     */
+    this.getBotSignMultisigWallet = function()
+    {
+        return this.botSignMultisig_;
+    };
+
+    /**
      * Get this bot's TIPPER Wallet Address
      *
      * This is the wallet used for Tipper Bot features,
@@ -198,19 +213,91 @@ var service = function(config, logger)
     this.getPaymentProcessor = function()
     {
         if (! this.paymentProcessor_) {
-            this.paymentProcessor_ = new NEMPaymentProcessor(this);
+            this.paymentProcessor_ = new PaymentProcessor(this);
         }
 
         return this.paymentProcessor_;
     };
 
-    this.getPaymentSigner = function()
+    this.getMultisigCosignatory = function()
     {
-        if (! this.paymentSigner_) {
-            //XXXthis.paymentSigner_ = new NEMPaymentSigner(this);
+        if (! this.multisigCosignatory_) {
+            this.multisigCosignatory_ = new MultisigCosignatory(this);
         }
 
-        return null; //XXX this.paymentSigner_;
+        return this.multisigCosignatory_;
+    };
+
+    /**
+     * Read the Transaction Hash from a given TransactionMetaDataPair
+     * object (gotten from NEM websockets or API).
+     *
+     * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
+     * @return {string}
+     */
+    this.getTransactionHash = function(transactionMetaDataPair)
+    {
+        var meta    = transactionMetaDataPair.meta;
+        var content = transactionMetaDataPair.transaction;
+
+        var trxHash = meta.hash.data;
+        if (meta.innerHash.data && meta.innerHash.data.length)
+            trxHash = meta.innerHash.data;
+
+        return trxHash;
+    };
+
+    /**
+     * Read the Transaction XEM Amount.
+     *
+     * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
+     * @return {[type]}                         [description]
+     */
+    this.getTransactionAmount = function(transactionMetaDataPair)
+    {
+        var meta    = transactionMetaDataPair.meta;
+        var content = transactionMetaDataPair.transaction;
+
+        var isMultiSig  = content.type === this.nem_.model.transactionTypes.multisigTransaction;
+        var realContent = isMultiSig ? content.otherTrans : content;
+        var isMosaic    = realContent.mosaics && realContent.mosaics.length > 0;
+
+        if (isMosaic) {
+            // read mosaics to find XEM, `content.amount` is now a multiplier!
+
+            var multiplier = realContent.amount / 1000000; // from microXEM to XEM
+            for (var i in realContent.mosaics) {
+                var mosaic = realContent.mosaics[i];
+                var isXEM  = mosaic.mosaicId.namespaceId == "nem" && mosaic.mosaicId.name == "xem";
+
+                if (!isXEM)
+                    continue;
+
+                // XEM divisibility is 10^6
+                return (multiplier * mosaic.quantity).toFixed(6);
+            }
+
+            // no XEM in transaction.
+            return 0;
+        }
+        else {
+            // not a mosaic transer, `content.amount` is our XEM amount.
+            return realContent.amount;
+        }
+    };
+
+    /**
+     * Read the Transaction XEM Fee amount.
+     *
+     * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
+     * @return {[type]}                         [description]
+     */
+    this.getTransactionFee = function(transactionMetaDataPair)
+    {
+        var meta    = transactionMetaDataPair.meta;
+        var content = transactionMetaDataPair.transaction;
+
+        return content.fee;
     };
 
     var self = this;
@@ -218,7 +305,6 @@ var service = function(config, logger)
         // nothing more done on instanciation
     }
 };
-
 
 module.exports.service = service;
 }());

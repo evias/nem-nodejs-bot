@@ -175,7 +175,7 @@ var NEMBotDB = function(config, io, chainDataLayer)
         matchTransactionToChannel: function(chainDataLayer, transactionMetaDataPair, callback)
         {
             if (! transactionMetaDataPair)
-                return callback(false)
+                return callback(false);
 
             var meta        = transactionMetaDataPair.meta;
             var transaction = transactionMetaDataPair.transaction;
@@ -315,12 +315,25 @@ var NEMBotDB = function(config, io, chainDataLayer)
         }
     };
 
+    this.NEMSignedTransaction_ = new this.dbms_.Schema({
+        multisigXEM: String,
+        cosignerXEM: String,
+        transactionHash: String,
+        nemNodeData: Object,
+        transactionData: Object,
+        amountXEM: {type: Number, min: 0},
+        createdAt: {type: Number, min: 0},
+        updatedAt: {type: Number, min: 0}
+    });
+
     // bind our Models classes
-    this.NEMPaymentChannel = this.dbms_.model("NEMPaymentChannel", this.NEMPaymentChannel_);
+    this.NEMPaymentChannel    = this.dbms_.model("NEMPaymentChannel", this.NEMPaymentChannel_);
+    this.NEMSignedTransaction = this.dbms_.model("NEMSignedTransaction_", this.NEMSignedTransaction_);
 };
 
 module.exports.NEMBotDB = NEMBotDB;
-module.exports.NEMPaymentChannel = NEMBotDB.NEMPaymentChannel;
+module.exports.NEMPaymentChannel    = NEMBotDB.NEMPaymentChannel;
+module.exports.NEMSignedTransaction = NEMBotDB.NEMSignedTransaction;
 module.exports.NEMBotDBMS = NEMBotDB.dbms_;
 }());
 
