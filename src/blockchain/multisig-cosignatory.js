@@ -89,7 +89,7 @@ var MultisigCosignatory = function(chainDataLayer)
             // transaction not found in database, will now issue transaction co-signing
             // in case this transaction does not exceed the daily maximum amount.
 
-            instance.logger().info("[NEM] [SIGN-SOCKET] [DEBUG]", __line, "now signing transaction: " + trxHash);
+            //DEBUG instance.logger().info("[NEM] [SIGN-SOCKET] [DEBUG]", __line, "now signing transaction: " + trxHash);
 
             instance.db_.NEMSignedTransaction.aggregate(
                 {$group: {_id: null, dailyAmount: {$sum: "$amountXEM"}}},
@@ -342,7 +342,7 @@ var MultisigCosignatory = function(chainDataLayer)
         //XXX implement config.bot.sign.acceptCosignatories: list of public keys
         //XXX implement verification of `trxRealAccount` and `config.bot.sign.multisigAddress`
 
-        self.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
+        //DEBUG self.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
 
         // (3) check transaction signature with initiator public key
         var trxSerialized= self.blockchain_.nem_.utils.serialization.serializeTransaction(content);
@@ -352,6 +352,7 @@ var MultisigCosignatory = function(chainDataLayer)
 
         // (4) transaction is genuine and was not tampered with, we can now sign it too.
 
+        //XXX transaction co-signing works BUT must use nem-sdk optimally..
         var nemTime    = self.blockchain_.nem_.utils.helpers.createNEMTimeStamp();
         var prepared   = {
             "fee": self.blockchain_.nem_.model.fees.signatureTransaction,
@@ -373,7 +374,7 @@ var MultisigCosignatory = function(chainDataLayer)
             "signature": signature.toString()
         });
 
-        self.logger().info("[NEM] [DEBUG] ", __line, 'Transaction "' + trxHash + '" signed: "' + signature.toString() + '"');
+        //DEBUG self.logger().info("[NEM] [DEBUG] ", __line, 'Transaction "' + trxHash + '" signed: "' + signature.toString() + '"');
 
         // (5) broadcast co-signed transaction, work done for this NEMBot.
         self.blockchain_.nem().com.requests
@@ -383,12 +384,13 @@ var MultisigCosignatory = function(chainDataLayer)
             if (res.code >= 2) {
                 self.blockchain_.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Error announcing transaction: " + res.message);
             }
-            else {
+            else if ("SUCCESS" == res.message) {
                 // transaction broadcast successfully.
 
-                self.logger().info("[NEM] [DEBUG] ", __line, 'Transaction "' + trxHash + '" was broadcast to the network with response: "' + res.message + '".');
+                self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'Transaction co-signed and broadcast: "' + trxHash + '" with response: "' + res.message + '".');
                 callback(res);
             }
+            // "NEUTRAL" will not trigger callback
         });
     };
 
