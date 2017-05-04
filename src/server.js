@@ -225,7 +225,7 @@ var NEMBot = function(config, logger, chainDataLayer)
             // This bot must ALWAYS listen to unconfirmed transactions, then decide
             // whether those are relevant FOR SIGNING or not.
 
-            self.configurePaymentSigner();
+            self.configureMultisigCosignatory();
         }
 
         io.sockets.on('connection', function(botSocket)
@@ -265,10 +265,11 @@ var NEMBot = function(config, logger, chainDataLayer)
             .connectBlockchainSocket();
     };
 
-    this.configurePaymentSigner = function()
+    this.configureMultisigCosignatory = function()
     {
         this.blockchain_
-            .getPaymentSigner();
+            .getMultisigCosignatory()
+            .connectBlockchainSocket();
     };
 
     /**

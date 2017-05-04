@@ -19,7 +19,8 @@
 
 var nemSDK = require("nem-sdk").default,
     nemAPI = require("nem-api"),
-    NEMPaymentProcessor = require("./payment-processor.js").PaymentProcessor;
+    PaymentProcessor = require("./payment-processor.js").PaymentProcessor,
+    MultisigCosignatory = require("./multisig-cosignatory.js").MultisigCosignatory;
 
 /**
  * class service provide a business layer for
@@ -55,7 +56,8 @@ var service = function(config, logger)
     this.botSignWallet_   = (process.env["BOT_SIGN_WALLET"] || this.conf_.bot.sign.cosignatory.walletAddress).replace(/-/g, "");
     this.botTipperWallet_ = (process.env["BOT_TIPPER_WALLET"] || this.conf_.bot.tipper.walletAddress).replace(/-/g, "");
 
-    this.paymentProcessor_ = undefined;
+    this.paymentProcessor_    = undefined;
+    this.multisigCosignatory_ = undefined;
 
     // define a helper for development debug of websocket
     this.socketLog = function(msg, type)
@@ -211,19 +213,19 @@ var service = function(config, logger)
     this.getPaymentProcessor = function()
     {
         if (! this.paymentProcessor_) {
-            this.paymentProcessor_ = new NEMPaymentProcessor(this);
+            this.paymentProcessor_ = new PaymentProcessor(this);
         }
 
         return this.paymentProcessor_;
     };
 
-    this.getPaymentSigner = function()
+    this.getMultisigCosignatory = function()
     {
-        if (! this.paymentSigner_) {
-            //XXXthis.paymentSigner_ = new NEMPaymentSigner(this);
+        if (! this.multisigCosignatory_) {
+            this.multisigCosignatory_ = new MultisigCosignatory(this);
         }
 
-        return null; //XXX this.paymentSigner_;
+        return this.multisigCosignatory_;
     };
 
     /**
@@ -256,7 +258,7 @@ var service = function(config, logger)
         var meta    = transactionMetaDataPair.meta;
         var content = transactionMetaDataPair.transaction;
 
-        var isMultiSig  = content.type === chainDataLayer.nem().model.transactionTypes.multisigTransaction;
+        var isMultiSig  = content.type === this.nem_.model.transactionTypes.multisigTransaction;
         var realContent = isMultiSig ? content.otherTrans : content;
         var isMosaic    = realContent.mosaics && realContent.mosaics.length > 0;
 
@@ -303,7 +305,6 @@ var service = function(config, logger)
         // nothing more done on instanciation
     }
 };
-
 
 module.exports.service = service;
 }());
