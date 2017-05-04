@@ -9,8 +9,14 @@
         },
         "sign": {
             "multisigAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
-            "walletAddress": "TBPGYGLO4QMZLVR4TZF7GSL5IHJAUNPFXFNEEP4V",
-            "privateKey": "Only insert your Private Key for Multi Signature Cosignatory Bots"
+            "cosignatory": {
+                "walletAddress": "TBRA6PUMPOFLGJ27ZM5XY2FSO4ZN2HIZBARU47UQ",
+                "publicKey": "d3ceb4d27abdb615642c87100bc6bc7e8df19c8b25b1a728e57a7fc497577326",
+                "privateKey": "794ce5e516813d1df7e819f901c0c14bb40d5104a5d979700f92b2078d91c12d"
+            },
+            "dailyMaxAmount": 0,
+            "dailyMaxCount": 0,
+            "onlyTransfers": true
         },
         "tipper": {
             "walletAddress": "TCKUDISVSIGYAKVABLTN2MUFWWITWK6US5XHPCGV",

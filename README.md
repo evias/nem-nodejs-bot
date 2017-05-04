@@ -139,6 +139,8 @@ and also to disable the default login credentials, like so:
 Usage Examples
 --------------
 
+### Example 1: Payment Processor NEMBot
+
 This example implements following Flow:
 
     - FRONTEND creates an invoice for someone to pay something
@@ -251,6 +253,9 @@ var startPaymentChannel = function(clientSocketId, callback)
     });
 </script>
 ```
+
+### Example 2: MultiSig Co-Signatory NEMBot
+
 
 Pot de vin
 ----------
