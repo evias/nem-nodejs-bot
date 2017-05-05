@@ -298,14 +298,53 @@ var MultisigCosignatory = function(chainDataLayer)
     };
 
     /**
+     * Verify an unconfirmed transaction. This method will check the
+     * transaction signature with initiator public key.
+     *
+     * /!\ In case this method returns `false`, it means the transaction
+     * has been tampered with and it is not safe to sign the
+     * transaction !
+     *
+     * @param  {[type]} transactionMetaDataPair [description]
+     * @return {[type]}                         [description]
+     */
+    this.verifyTransaction = function(transactionMetaDataPair)
+    {
+        var meta    = transactionMetaDataPair.meta;
+        var content = transactionMetaDataPair.transaction;
+        var trxHash = this.blockchain_.getTransactionHash(transactionMetaDataPair);
+
+        var isMultisig   = content.type === this.blockchain_.nem_.model.transactionTypes.multisigTransaction;
+        var trxRealData  = isMultisig ? content.otherTrans : content;
+        var trxSignature = content.signature;
+        var trxInitiatorPubKey = content.signer;
+
+        // in case we have a multisig, the transaction.otherTrans.signer is the Multisig
+        // Account public key. This lets us verify the authenticity of the Transaction some more.
+        var trxAcctPubKey  = trxRealData.signer;
+        var trxRealAccount = this.blockchain_.nem_.model.address.toAddress(trxAcctPubKey);
+
+        //XXX implement config.bot.sign.acceptCosignatories: list of public keys
+        //XXX implement verification of `trxRealAccount` and `config.bot.sign.multisigAddress`
+
+        //DEBUG this.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
+
+        // check transaction signature with initiator public key
+        var trxSerialized = this.blockchain_.nem_.utils.serialization.serializeTransaction(content);
+
+        return this.blockchain_.nem_
+                   .crypto.keyPair.verify(trxInitiatorPubKey, trxSerialized, trxSignature);
+    };
+
+    /**
      * Sign a transactionMetaDataPair transaction object. In case this is a multisig
      * transaction, it will sign the correct `transaction.otherTrans` underlying object.
      *
-     * This function verifies the private key first and transaction signature before
+     * This function verifies the private key and transaction signature before
      * issuing a signature itself and broadcasting it to the network.
      *
      * The `callback` callable will be executed only in case of a successful broadcasting
-     * of the signed transaction.
+     * of the signed signature transaction.
      *
      * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
      * @param  {Function} callback                [description]
@@ -328,37 +367,20 @@ var MultisigCosignatory = function(chainDataLayer)
 
         // (2) verify transaction validity on the blockchain
 
-        var commonPair   = self.blockchain_.nem_.model.objects.create("common")("", privateKey);
-        var secretPair   = self.blockchain_.nem_.crypto.keyPair.create(privateKey);
-        var senderPubKey = secretPair.publicKey.toString();
-        var isMultisig   = content.type === self.blockchain_.nem_.model.transactionTypes.multisigTransaction;
-        var trxRealData  = isMultisig ? content.otherTrans : content;
-        var trxSignature = content.signature;
-        var trxInitiatorPubKey = content.signer;
-
-        // in case we have a multisig, the transaction.otherTrans.signer is the Multisig
-        // Account public key. This lets us verify the authenticity of the Transaction some more.
-        var trxAcctPubKey  = trxRealData.signer;
-        var trxRealAccount = self.blockchain_.nem_.model.address.toAddress(trxAcctPubKey);
-
-        //XXX implement config.bot.sign.acceptCosignatories: list of public keys
-        //XXX implement verification of `trxRealAccount` and `config.bot.sign.multisigAddress`
-
-        //DEBUG self.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
-
-        // (3) check transaction signature with initiator public key
-        var trxSerialized= self.blockchain_.nem_.utils.serialization.serializeTransaction(content);
-        if (! self.blockchain_.nem_.crypto.keyPair.verify(trxInitiatorPubKey, trxSerialized, trxSignature)) {
+        if (! self.verifyTransaction(transactionMetaDataPair)) {
             throw "Invalid transactionMetaDataPair object provided. Signature could not be verified!";
         }
 
-        // (4) transaction is genuine and was not tampered with, we can now sign it too.
+        // (3) transaction is genuine and was not tampered with, we can now sign it too.
 
-        //XXX transaction co-signing works BUT must use nem-sdk optimally..
-        var networkId = self.blockchain_.getNetwork().config.id;
-        var signTx    = self.blockchain_.nem_.model.objects.create("signatureTransaction")(multisigWallet, trxHash);
-        var prepared  = self.blockchain_.nem_.model.transactions.prepare("signatureTransaction")(commonPair, signTx, networkId);
+        // prepare signature transaction
+        var commonPair = self.blockchain_.nem_.model.objects.create("common")("", privateKey);
+        var networkId  = self.blockchain_.getNetwork().config.id;
+        var signTx     = self.blockchain_.nem_.model.objects.create("signatureTransaction")(multisigWallet, trxHash);
+        var prepared   = self.blockchain_.nem_.model.transactions.prepare("signatureTransaction")(commonPair, signTx, networkId);
 
+        // sign signature transaction
+        var secretPair = self.blockchain_.nem_.crypto.keyPair.create(privateKey);
         var serialized = self.blockchain_.nem_.utils.serialization.serializeTransaction(prepared);
         var signature  = secretPair.sign(serialized);
         var broadcastable = JSON.stringify({
@@ -368,7 +390,7 @@ var MultisigCosignatory = function(chainDataLayer)
 
         //DEBUG self.logger().info("[NEM] [DEBUG] ", __line, 'Transaction "' + trxHash + '" signed: "' + signature.toString() + '"');
 
-        // (5) broadcast co-signed transaction, work done for this NEMBot.
+        // (4) broadcast signed signature transaction, work done for this NEMBot.
         self.blockchain_.nem().com.requests
                 .transaction.announce(self.blockchain_.endpoint(), broadcastable)
         .then(function(res)

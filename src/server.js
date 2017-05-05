@@ -114,12 +114,29 @@ var NEMBot = function(config, logger, chainDataLayer)
                     });
                 });
 
+            app.get("/api/v1/transactions", function(req, res)
+                {
+                    res.setHeader('Content-Type', 'application/json');
+
+                    self.db.NEMSignedTransaction.find({}, function(err, signedTrxs)
+                    {
+                        if (err) return res.send(JSON.stringify({"status": "error", "message": err}));
+
+                        var responseData = {};
+                        responseData.status = "ok";
+                        responseData.data = signedTrxs;
+
+                        return res.send(JSON.stringify(responseData));
+                    });
+                });
+
             //XXX will be removed or secured
             app.get("/api/v1/reset", function(req, res)
                 {
                     res.setHeader('Content-Type', 'application/json');
 
                     self.db.NEMPaymentChannel.remove({});
+                    self.db.NEMSignedTransaction.remove({});
                 });
         }
     };
