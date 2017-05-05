@@ -156,12 +156,12 @@ var MultisigCosignatory = function(chainDataLayer)
         // has missed any (happens maybe only on testnet, but this is for being sure.). The same event
         // will be emitted in case a transaction is found un-forwarded.
         instance.blockchain_.nem().com
-            .requests.account.unconfirmedTransactions(instance.blockchain_.endpoint(), instance.blockchain_.getBotSignWallet())
+            .requests.account.unconfirmedTransactions(instance.blockchain_.endpoint(), instance.blockchain_.getBotSignMultisigWallet())
             .then(function(res)
         {
             var unconfirmed = res;
 
-            instance.logger().info("[NEM] [SIGN-FALLBACK] [TRY] ", __line, "will now sign " + unconfirmed.length + " transactions with " + instance.blockchain_.getBotSignWallet() + " for " + instance.blockchain_.getBotSignMultisigWallet() + ".");
+            instance.logger().info("[NEM] [SIGN-FALLBACK] [TRY] ", __line, "will now try to sign " + unconfirmed.length + " transactions with " + instance.blockchain_.getBotSignWallet() + " for " + instance.blockchain_.getBotSignMultisigWallet() + ".");
 
             for (var i in unconfirmed) {
                 var transaction = unconfirmed[i];
@@ -235,11 +235,11 @@ var MultisigCosignatory = function(chainDataLayer)
                           "Error Happened: " + message.body);
             });
 
-            var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotSignWallet();
+            var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotSignMultisigWallet();
             var sendUri        = "/w/api/account/transfers/all";
 
             // NEM Websocket unconfirmed transactions Listener
-            self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'subscribing to /unconfirmed/' + self.blockchain_.getBotSignWallet() + '.');
+            self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'subscribing to ' + unconfirmedUri + '.');
             self.nemSubscriptions_[unconfirmedUri] = self.nemsocket_.subscribeWS(unconfirmedUri, function(message)
             {
                 var parsed = JSON.parse(message.body);
@@ -320,7 +320,7 @@ var MultisigCosignatory = function(chainDataLayer)
 
         // (1) read config and check co-signing ability of this NEMBot (private key required)
         var privateKey = self.blockchain_.conf_.bot.sign.cosignatory.privateKey;
-        var multisigWallet = self.blockchain_.conf_.bot.sign.multisigAddress;
+        var multisigWallet = self.blockchain_.getBotSignMultisigWallet();
 
         if (! self.blockchain_.nem_.utils.helpers.isPrivateKeyValid(privateKey)) {
             throw "Invalid private key in bot.json, Please fix to start co-signing NEM blockchain transactions.";
@@ -328,7 +328,9 @@ var MultisigCosignatory = function(chainDataLayer)
 
         // (2) verify transaction validity on the blockchain
 
+        var commonPair   = self.blockchain_.nem_.model.objects.create("common")("", privateKey);
         var secretPair   = self.blockchain_.nem_.crypto.keyPair.create(privateKey);
+        var senderPubKey = secretPair.publicKey.toString();
         var isMultisig   = content.type === self.blockchain_.nem_.model.transactionTypes.multisigTransaction;
         var trxRealData  = isMultisig ? content.otherTrans : content;
         var trxSignature = content.signature;
@@ -353,19 +355,9 @@ var MultisigCosignatory = function(chainDataLayer)
         // (4) transaction is genuine and was not tampered with, we can now sign it too.
 
         //XXX transaction co-signing works BUT must use nem-sdk optimally..
-        var nemTime    = self.blockchain_.nem_.utils.helpers.createNEMTimeStamp();
-        var prepared   = {
-            "fee": self.blockchain_.nem_.model.fees.signatureTransaction,
-            "otherHash": {
-                "data": trxHash
-            },
-            "otherAccount": multisigWallet,
-            "type": self.blockchain_.nem_.model.transactionTypes.multisigSignature,
-            "version": 0x98000000 | 1, // testnet
-            "signer": secretPair.publicKey.toString(),
-            "timeStamp": nemTime,
-            "deadline": nemTime + 60 * 60 // testnet 1 hour
-        };
+        var networkId = self.blockchain_.getNetwork().config.id;
+        var signTx    = self.blockchain_.nem_.model.objects.create("signatureTransaction")(multisigWallet, trxHash);
+        var prepared  = self.blockchain_.nem_.model.transactions.prepare("signatureTransaction")(commonPair, signTx, networkId);
 
         var serialized = self.blockchain_.nem_.utils.serialization.serializeTransaction(prepared);
         var signature  = secretPair.sign(serialized);
