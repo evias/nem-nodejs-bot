@@ -155,6 +155,17 @@ var service = function(config, logger)
     };
 
     /**
+     * Get this bot's secret Private Key.
+     *
+     * @return string   XEM account address for the Bot
+     */
+    this.getBotSignSecret = function()
+    {
+        var pkey = (process.env["BOT_SIGN_PKEY"] || this.conf_.bot.sign.cosignatory.privateKey);
+        return pkey;
+    };
+
+    /**
      * Get this bot's TIPPER Wallet Address
      *
      * This is the wallet used for Tipper Bot features,

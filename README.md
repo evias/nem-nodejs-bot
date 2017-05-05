@@ -4,21 +4,27 @@ nem-nodejs-bot: Node.js Bot for the NEM blockchain
 This is a multi feature Bot written in Node.js for the NEM blockchain. This bot can be deployed to Heroku free tiers
 or serving locally.
 
-Main features of this bot include listening to account transactions income or account data modifications and cosigning
-multi signature accounts transactions. The NEMBot aims to be hidden such that Websites using the Bot to get Payment
-Updates, never **directly** communicate with the Bot. This helps secure the Signing features but also gives more Privacy
-to any company which wishes to use the NEMBot to Listen to Incoming Transaction (example of NEMPay).
+Main features of this bot include **listening** to account **transactions** income or account data modifications and **cosigning**
+multi signature accounts **transactions**.
+
+The **NEMBot** aims to be hidden such that Websites using the Bot for *payment processing*, never **directly** communicate with the Bot.
+This helps secure the Signing features but also gives more Privacy to any company using the NEMBot for their Payment Processor (example of
+NEMPay).
 
 Socket.io is used to Proxy the Communication between the NEMBot and your Node.js express app. This is to avoid addressing
 your NEMBot over HTTP or Websocket **directly**(traceable in the Network Console). I decided to implement a Proxying mechanism
 using Socket.io that will be placed between the Frontend and the Bot such that **even reading** is kept private.
 
-The multisignature co-signing features will not be using any other Communication protocol than the Blockchain itself! This is
-possible with the Multi Signature Account Push Notification System right in the NEM blockchain core. Communicating only through
-the NEM Blockchain is a security feature that will help not disclose the NEMBot(s) used for co-signing.
+The multisignature co-signing features do not use any other **communications** protocol than the **Blockchain** itself! This is
+possible with the *Multi Signature Account Push Notification System* right in the NEM blockchain core. Communicating only through
+the NEM Blockchain is a security feature that will help not disclose locations of the NEMBot(s) used for co-signing.
 
 The NEMBot also provides a HTTP/JSON API for which the endpoints will be listed in this document. The HTTP/JSON API should only
-provide with a READ API such that the database of the NEMBot(s) can be read.
+provide with a READ API such that the database of the NEMBot(s) can be read. **In the current state of development, however,
+there is a /api/v1/reset API endpoint to RESET the NEMBot data**. Please be aware of this if you decide to use the NEMBot already.
+
+This bot can secure your application in a new way as you can deploy **any count** of NEMBots to **co-sign** your multisig accounts
+transactions. This way you can configure a secure multisig infrastructure and let the NEMBot handle co-signing automatically.
 
 Dependencies
 ------------
@@ -30,15 +36,18 @@ and Websockets (which we will use).
 This project will implement a mix of both libraries. First, the nem-api package is used to connect to the Blockchain using
 Websockets and the nem-sdk library is used as a second layer of security whenever websockets process relevant data.
 
+Also, a Websocket fallback is implemented using the ```nem-sdk```, such that Payment Processing never misses a Transaction
+and Co-Signing neither. (Features in the source code are separated into PaymentProcessor and MultisigCosignatory classes).
+
 Installation
 ------------
 
 The bot can be configured to execute any of the following features:
  - Payment Channel Listening (mode **read**)
  - Balance Modifications Listening  (mode **read**)
- - Cosignatory Auditing (mode **read**)
  - Multi Signature Transaction Co-Signing (mode **sign**)
- - Tip Bots (HTTP/JSON API) (mode **tip**)
+ - Cosignatory Auditing (mode **read**) *not yet implement*
+ - Tip Bots (HTTP/JSON API) (mode **tip**)*not yet implement*
 
 Only SIGN and TIP features need your Private Key, change the "mode" config to "read" or "sign" or "tip" or "all" to enable/disable read and write.
 You can also use an array for configuring the bot to use ["read", "tip"] features for example. The tipper bot features also need a Private Key.
@@ -53,7 +62,7 @@ You should now take a look at ```config/bot.json``` and configure your Bot insta
 
 After configuration, you can start the Bot, locally this would be:
 ```
-    $ npm run_bot.js
+    $ node run_bot.js
 ```
 
 Your bot is now running on localhost! The **API** is published on **port 29081** by default.
@@ -80,13 +89,17 @@ configuration field:
     - bot.read.walletAddress : Type: text. XEM Address of the Account for which the Bot should Listen to Payments.
         - overwrite with environment variable BOT_READ_WALLET
     - bot.read.duration : Type: integer. Default Payment Channel duration (5 minutes) - expressed in Milliseconds.
+    - bot.read.useTransactionMessageAlways: Type: boolean. Whether to require Messages in transactions or not. **experimental for now only with messages tested**
 
     MultiSig Co-Signing
     -------------------
     - bot.sign.multisigAddress : Type: text. XEM Address of the Multi Signature Account of which this Bot is a Co-Signatory.
-    - bot.sign.walletAddress : Type: text. XEM Address of the Account to **use** for Co-Signing Multi Signature Transactions.
+    - bot.sign.cosignatory.walletAddress : Type: text. XEM Address of the Account to **use** for Co-Signing Multi Signature Transactions.
         - overwrite with environment variable BOT_SIGN_WALLET
-    - bot.sign.privateKey : Type: text. Private Key of the Account to **use** for Co-Signing Multi Signature Transactions. (Should be the Private Key of the Account ```bot.sign.walletAddress```).
+    - bot.sign.cosignatory.privateKey : Type: text. Private Key of the Account to **use** for Co-Signing Multi Signature Transactions. (Should be the Private Key of the Account ```bot.sign.walletAddress```).
+    - bot.sign.cosignatory.acceptFrom : Type: text. Public Key of accounts from which we will accept unconfirmed transactions.
+    - bot.sign.dailyMaxAmount : Type: number. Maximum amount of Micro XEM to allow in co-signer mode.
+    - bot.sign.onlyTransfers : Type: boolean. Whether to sign other transaction than Transfer *not yet implemented*
 
     Tipper Features
     ---------------
@@ -114,6 +127,14 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
         - APP_ENV : Environment of your NEMBot. Can be either production or development.
         - ENCRYPT_PASS : Should contain the configuration file encryption password. (if not set, will ask in terminal)
         - PORT : Should contain the Port on which the Bot HTTP/JSON API & Websockets will be addressed.
+
+    - Recommended:
+        - BOT_MODE : overwrite config.bot.mode.
+        - BOT_READ_WALLET : overwrite config.bot.read.walletAddress
+        - BOT_MULTISIG_WALLET : overwrite config.bot.sign.multisigAdress
+        - BOT_SIGN_WALLET : overwrite config.bot.sign.cosignatory.walletAddress
+        - BOT_SIGN_PKEY : overwrite config.bot.sign.cosignatory.privateKey
+        - BOT_TIPPER_WALLET : overwrite config.bot.tipper.walletAddress
 
     - Optional :
         - NEM_HOST : Mainnet default NEM node. (http://alice6.nem.ninja)
@@ -255,6 +276,8 @@ var startPaymentChannel = function(clientSocketId, callback)
 ```
 
 ### Example 2: MultiSig Co-Signatory NEMBot
+
+Example to come soon, features implemented in src/blockchain/multisig-cosignatory.js
 
 
 Pot de vin
