@@ -260,12 +260,6 @@ var NEMBot = function(config, logger, chainDataLayer)
                 self.configurePaymentChannelWebsocket(botSocket);
             }
 
-            // NEMBot "sign" features:
-            // - Multi Signature Transactions Co-Signing automatization
-            if (self.blockchain_.isSignBot()) {
-                //XXX
-            }
-
             botSocket.on('nembot_disconnect', function () {
                 logger.info("[BOT] [" + botSocket.id + "]", __line, '~nembot()');
 
@@ -319,6 +313,9 @@ var NEMBot = function(config, logger, chainDataLayer)
                 "recipientXEM": params.recipient,
                 "message": params.message
             };
+
+            // join the socket IO room for the given payment channel message (invoice number)
+            botSocket.join(params.message);
 
             self.db.NEMPaymentChannel.findOne(channelQuery, function(err, paymentChannel)
             {

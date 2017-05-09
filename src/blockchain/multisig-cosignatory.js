@@ -372,6 +372,8 @@ var MultisigCosignatory = function(chainDataLayer)
             throw "Invalid transactionMetaDataPair object provided. Signature could not be verified!";
         }
 
+        //XXX only sign transactions if they correspond to this NEMBot's co-signing conditions (other than max daily amount..)
+
         // (3) transaction is genuine and was not tampered with, we can now sign it too.
 
         // prepare signature transaction

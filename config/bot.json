@@ -37,8 +37,11 @@
             {"host": "http://san.nem.ninja", "port": 7890}
         ],
         "nodes_test": [
+            {"host": "http://bigalice2.nem.ninja", "port": 7890},
             {"host": "http://bob.nem.ninja", "port": 7890},
-            {"host": "http://bigalice2.nem.ninja", "port": 7890}
+            {"host": "http://104.128.226.60", "port": 7890},
+            {"host": "http://23.22.67.85", "port": 7890}
+
         ]
     }
 }
