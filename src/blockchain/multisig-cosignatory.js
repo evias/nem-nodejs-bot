@@ -321,20 +321,51 @@ var MultisigCosignatory = function(chainDataLayer)
 
         // in case we have a multisig, the transaction.otherTrans.signer is the Multisig
         // Account public key. This lets us verify the authenticity of the Transaction some more.
-        var trxAcctPubKey  = trxRealData.signer;
-        var trxRealAccount = self.blockchain_.nem_.model.address.toAddress(trxAcctPubKey);
+        var trxAcctPubKey   = trxRealData.signer;
+        var trxRealAccount  = self.blockchain_.nem_.model.address.toAddress(trxAcctPubKey).replace(/-/g, '');
+        var multisigAccount = self.config().bot.sign.multisigAddress;
 
-        //XXX implement config.bot.sign.acceptCosignatories: list of public keys
-        //XXX implement verification of `trxRealAccount` and `config.bot.sign.multisigAddress`
+        if (! self.isAcceptedCosignatory(trxInitiatorPubKey))
+            // bot.sign.cosignatory.acceptFrom
+            return false;
+
+        if (trxRealAccount != multisigAccount)
+            // will only sign transaction for the configured multisignature address.
+            return false;
 
         //DEBUG self.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
 
         // check transaction signature with initiator public key
 
         //XXX BUG HERE - verification does not work anymore
-        //XXX var trxSerialized = self.blockchain_.nem_.utils.serialization.serializeTransaction(content);
-        //XXX return self.blockchain_.nem_.crypto.keyPair.verify(trxInitiatorPubKey, trxSerialized, trxSignature);
-        return true;
+        var trxSerialized = self.blockchain_.nem_.utils.serialization.serializeTransaction(trxRealData);
+        return self.blockchain_.nem_.crypto.keyPair.verify(trxInitiatorPubKey, trxSerialized, trxSignature);
+    };
+
+    /**
+     * Check whether the given public key is a valid listed cosignatory.
+     *
+     * Accepted cosignatories can be listed in the `config/bot.json` file under
+     * `bot.sign.cosignatory.acceptFrom` as an array of public keys.
+     *
+     * @param  {string}  cosigPubKey
+     * @return {Boolean}
+     */
+    this.isAcceptedCosignatory = function(cosigPubKey)
+    {
+        var self   = this;
+        var cosigs = self.config().bot.sign.cosignatory.acceptFrom;
+
+        if (typeof cosigs == "string")
+            return cosigs === cosigPubKey;
+
+        for (var i in cosigs) {
+            var valid = cosigs[i];
+            if (valid === cosigPubKey)
+                return true;
+        }
+
+        return false;
     };
 
     /**
@@ -395,7 +426,7 @@ var MultisigCosignatory = function(chainDataLayer)
 
         // (4) broadcast signed signature transaction, work done for this NEMBot.
         self.blockchain_.nem().com.requests
-                .transaction.announce(self.blockchain_.endpoint(), broadcastable)
+            .transaction.announce(self.blockchain_.endpoint(), broadcastable)
         .then(function(res)
         {
             if (res.code >= 2) {
