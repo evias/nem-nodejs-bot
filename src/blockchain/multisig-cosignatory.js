@@ -322,7 +322,7 @@ var MultisigCosignatory = function(chainDataLayer)
         // in case we have a multisig, the transaction.otherTrans.signer is the Multisig
         // Account public key. This lets us verify the authenticity of the Transaction some more.
         var trxAcctPubKey   = trxRealData.signer;
-        var trxRealAccount  = self.blockchain_.nem_.model.address.toAddress(trxAcctPubKey).replace(/-/g, '');
+        var trxRealAccount  = self.blockchain_.nem_.model.address.toAddress(trxAcctPubKey, self.blockchain_.getNetwork().config.id).replace(/-/g, '');
         var multisigAccount = self.config().bot.sign.multisigAddress;
 
         if (! self.isAcceptedCosignatory(trxInitiatorPubKey))
