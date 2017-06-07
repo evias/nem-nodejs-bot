@@ -301,7 +301,7 @@ var NEMBotDB = function(config, io, chainDataLayer)
             }
             else if ("unconfirmed" == status) {
                 channel.amountUnconfirmed += transaction.amount;
-                channel.status = "identified";
+                channel.status = "unconfirmed";
 
                 channel.unconfirmedHashes = channel.addUnconfirmed(transactionMetaDataPair);
             }

@@ -337,8 +337,8 @@ var MultisigCosignatory = function(chainDataLayer)
 
         // check transaction signature with initiator public key
 
-        //XXX BUG WITH SIGNING - WORK IN PROGRESS
-        //var trxSerialized = self.blockchain_.nem_.utils.serialization.serializeTransaction(trxRealData);
+        //XXX should be fixed now, must be tested
+        //var trxSerialized = self.blockchain_.nem_.utils.serialization.serializeTransaction(content);
         //return self.blockchain_.nem_.crypto.verifySignature(trxInitiatorPubKey, trxSerialized, trxSignature);
         return true;
     };
