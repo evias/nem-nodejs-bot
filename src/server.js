@@ -157,7 +157,7 @@ var NEMBot = function(config, logger, chainDataLayer)
          * This starts the NodeJS server and makes the Game
          * available from the Browser.
          */
-        var port = process.env['PORT'] = process.env.PORT || 29081;
+        var port = process.env['PORT'] = process.env.PORT || self.config_.bot.connection.port || 29081;
         server.listen(port, function()
             {
                 var network    = self.blockchain_.getNetwork();

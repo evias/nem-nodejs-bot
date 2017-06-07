@@ -26,6 +26,9 @@
         "protectedAPI": true,
         "db": {
             "uri": "mongodb://localhost/NEMBotDB"
+        },
+        "connection": {
+            "port": 29081
         }
     },
     "nem": {
