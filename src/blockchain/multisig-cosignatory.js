@@ -316,7 +316,7 @@ var MultisigCosignatory = function(chainDataLayer)
 
         var isMultisig   = content.type === self.blockchain_.nem_.model.transactionTypes.multisigTransaction;
         var trxRealData  = isMultisig ? content.otherTrans : content;
-        var trxSignature = content.signature;
+        var trxSignature = content.signature.toString();
         var trxInitiatorPubKey = content.signer;
 
         // in case we have a multisig, the transaction.otherTrans.signer is the Multisig
@@ -333,13 +333,13 @@ var MultisigCosignatory = function(chainDataLayer)
             // will only sign transaction for the configured multisignature address.
             return false;
 
-        //DEBUG self.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
+        self.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
 
         // check transaction signature with initiator public key
 
-        //XXX BUG HERE - verification does not work anymore
+        //XXX BUG WITH SIGNING - WORK IN PROGRESS
         //var trxSerialized = self.blockchain_.nem_.utils.serialization.serializeTransaction(trxRealData);
-        //return self.blockchain_.nem_.crypto.keyPair.verify(trxInitiatorPubKey, trxSerialized, trxSignature);
+        //return self.blockchain_.nem_.crypto.verifySignature(trxInitiatorPubKey, trxSerialized, trxSignature);
         return true;
     };
 
@@ -440,6 +440,9 @@ var MultisigCosignatory = function(chainDataLayer)
                 callback(res);
             }
             // "NEUTRAL" will not trigger callback
+        },
+        function(err) {
+            self.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Signing error: " + err);
         });
     };
 
