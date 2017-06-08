@@ -326,14 +326,30 @@ var NEMBotDB = function(config, io, chainDataLayer)
         updatedAt: {type: Number, min: 0}
     });
 
+    this.NEMTransactionPool_ = new this.dbms_.Schema({
+        status: String,
+        transactionHash: String,
+        createdAt: {type: Number, min: 0},
+        updatedAt: {type: Number, min: 0}
+    });
+
+    this.NEMBlockHeight_ = new this.dbms_.Schema({
+        blockHeight: {type: Number, min: 0},
+        createdAt: {type: Number, min: 0}
+    });
+
     // bind our Models classes
     this.NEMPaymentChannel    = this.dbms_.model("NEMPaymentChannel", this.NEMPaymentChannel_);
     this.NEMSignedTransaction = this.dbms_.model("NEMSignedTransaction_", this.NEMSignedTransaction_);
+    this.NEMTransactionPool   = this.dbms_.model("NEMTransactionPool", this.NEMTransactionPool_);
+    this.NEMBlockHeight       = this.dbms_.model("NEMBlockHeight", this.NEMBlockHeight_);
 };
 
 module.exports.NEMBotDB = NEMBotDB;
 module.exports.NEMPaymentChannel    = NEMBotDB.NEMPaymentChannel;
 module.exports.NEMSignedTransaction = NEMBotDB.NEMSignedTransaction;
+module.exports.NEMTransactionPool   = NEMBotDB.NEMTransactionPool;
+module.exports.NEMBlockHeight       = NEMBotDB.NEMBlockHeight;
 module.exports.NEMBotDBMS = NEMBotDB.dbms_;
 }());
 
