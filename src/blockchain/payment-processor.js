@@ -49,6 +49,8 @@ var PaymentProcessor = function(chainDataLayer)
     this.socketById = {};
     this.nemConnection_ = null;
     this.nemSubscriptions_ = {};
+    this.confirmedTrxes = {};
+    this.unconfirmedTrxes = {};
 
     this.options_ = {
         mandatoryMessage: true
@@ -119,14 +121,26 @@ var PaymentProcessor = function(chainDataLayer)
                 var content = transaction.transaction;
                 var trxHash = instance.blockchain_.getTransactionHash(transaction);
 
-                //DEBUG instance.logger().info("[NEM] [PAY-FALLBACK] [TRY] ", __line, "now trying transaction: " + trxHash);
+                instance.db_.NEMTransactionPool.findOne({status: "confirmed", transactionHash: trxHash}, function(err, entry)
+                {
+                    if (err || entry)
+                        // error OR entry FOUND => transaction not processed this time.
+                        return false;
 
-                instance.db_.NEMPaymentChannel.matchTransactionToChannel(instance.blockchain_, transaction, function(paymentChannel, trx)
+                    var creation  = new instance.db_.NEMTransactionPool({
+                        status: "confirmed",
+                        transactionHash: trxHash,
+                        createdAt: new Date().valueOf()
+                    });
+                    creation.save();
+
+                    instance.db_.NEMPaymentChannel.matchTransactionToChannel(instance.blockchain_, transaction, function(paymentChannel, trx)
                     {
                         if (paymentChannel !== false) {
                             websocketChannelTransactionHandler(instance, paymentChannel, trx, "confirmed", "PAY-FALLBACK");
                         }
                     });
+                });
             }
         }, function(err) { instance.logger().error("[NEM] [ERROR] [PAY-FALLBACK]", __line, "NIS API incomingTransactions Error: " + err); });
     };
@@ -188,9 +202,6 @@ var PaymentProcessor = function(chainDataLayer)
             {
                 var parsed = JSON.parse(message.body);
                 self.logger().info("[NEM] [PAY-SOCKET]", __line, 'new_block(' + JSON.stringify(parsed) + ')');
-
-                // new blocks means we might have new transactions to process !
-                websocketFallbackHandler(self);
             });
 
             var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotReadWallet();
@@ -208,12 +219,26 @@ var PaymentProcessor = function(chainDataLayer)
                 var transaction     = transactionData.transaction;
                 var trxHash         = self.blockchain_.getTransactionHash(transactionData);
 
-                self.db_.NEMPaymentChannel.matchTransactionToChannel(self.blockchain_, transactionData, function(paymentChannel)
+                self.db_.NEMTransactionPool.findOne({transactionHash: trxHash}, function(err, entry)
+                {
+                    if (err || entry)
+                        // error OR entry FOUND => transaction not processed this time.
+                        return false;
+
+                    var creation  = new self.db_.NEMTransactionPool({
+                        status: "unconfirmed",
+                        transactionHash: trxHash,
+                        createdAt: new Date().valueOf()
+                    });
+                    creation.save();
+
+                    self.db_.NEMPaymentChannel.matchTransactionToChannel(self.blockchain_, transactionData, function(paymentChannel)
                     {
                         if (paymentChannel !== false) {
                             websocketChannelTransactionHandler(self, paymentChannel, transactionData, "unconfirmed", "SOCKET");
                         }
                     });
+                });
             });
 
             // NEM Websocket confirmed transactions Listener
@@ -227,12 +252,27 @@ var PaymentProcessor = function(chainDataLayer)
                 var transaction     = transactionData.transaction;
                 var trxHash         = self.blockchain_.getTransactionHash(transactionData);
 
-                self.db_.NEMPaymentChannel.matchTransactionToChannel(self.blockchain_, transactionData, function(paymentChannel)
+                // this time also include "status" filtering.
+                self.db_.NEMTransactionPool.findOne({status: "confirmed", transactionHash: trxHash}, function(err, entry)
+                {
+                    if (err || entry)
+                        // error OR entry FOUND => transaction not processed this time.
+                        return false;
+
+                    var creation  = new self.db_.NEMTransactionPool({
+                        status: "confirmed",
+                        transactionHash: trxHash,
+                        createdAt: new Date().valueOf()
+                    });
+                    creation.save();
+
+                    self.db_.NEMPaymentChannel.matchTransactionToChannel(self.blockchain_, transactionData, function(paymentChannel)
                     {
                         if (paymentChannel !== false) {
                             websocketChannelTransactionHandler(self, paymentChannel, transactionData, "confirmed", "SOCKET");
                         }
                     });
+                });
             });
 
             self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotReadWallet() }));
@@ -274,6 +314,12 @@ var PaymentProcessor = function(chainDataLayer)
 
         var endTime_ = startTime_ + duration_;
         var self = this;
+
+//XXX
+//XXX We should only define a fallback handler when we dont receive
+//XXX new block updates through sockets anymore... this means that
+//XXX the websocket connection as dropped or is buggy.
+//XXX
 
         // We will now configure a websocket fallback because the backend has requested
         // to open a payment channel. Handling websocket communication is done when connecting
