@@ -202,6 +202,12 @@ var PaymentProcessor = function(chainDataLayer)
             {
                 var parsed = JSON.parse(message.body);
                 self.logger().info("[NEM] [PAY-SOCKET]", __line, 'new_block(' + JSON.stringify(parsed) + ')');
+
+                var block  = new self.db_.NEMBlockHeight({
+                    blockHeight: parsed.height,
+                    createdAt: new Date().valueOf()
+                });
+                block.save();
             });
 
             var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotReadWallet();
@@ -315,32 +321,20 @@ var PaymentProcessor = function(chainDataLayer)
         var endTime_ = startTime_ + duration_;
         var self = this;
 
-//XXX
-//XXX We should only define a fallback handler when we dont receive
-//XXX new block updates through sockets anymore... this means that
-//XXX the websocket connection as dropped or is buggy.
-//XXX
-
-        // We will now configure a websocket fallback because the backend has requested
-        // to open a payment channel. Handling websocket communication is done when connecting
-        // to the Blockchain Sockets so here we only need to provide with a Fallback for this
-        // particular payment channel otherwize it would get very traffic intensive.
-
-        // fallback handler queries the blockchain every 120 seconds
+        // fallback handler queries the blockchain every 5 minutes
+        // ONLY IN CASE THE BLOCKS WEBSOCKET HAS NOT FILLE DATA FOR
+        // 5 MINUTES ANYMORE (meaning the websocket connection is buggy).
         var fallbackInterval = setInterval(function()
         {
-            websocketFallbackHandler(self);
-        }, 120 * 1000);
-
-        setTimeout(function() {
-            clearInterval(fallbackInterval);
-
-            // closing fallback communication channel, update one more time.
-            websocketFallbackHandler(self);
-        }, (duration_ + (60 * 1000)));
-
-        // check payment state now - do not wait 30 seconds
-        websocketFallbackHandler(self);
+            self.db_.NEMBlockHeight.find({}, [], {limit: 1, sort: {createdAt: -1}}, function(err, lastBlock)
+                {
+                    var nowTime = new Date().valueOf();
+                    if (lastBlock.createdAt < (nowTime - 5 * 60 * 1000)) {
+                        // last block is 5 minutes old, use the FALLBACK!
+                        websocketFallbackHandler(self);
+                    }
+                });
+        }, 300 * 1000);
     };
 
     /**
