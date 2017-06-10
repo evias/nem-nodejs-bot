@@ -211,7 +211,7 @@ var NEMBotDB = function(config, io, chainDataLayer)
 
                 // DEBUG dbLog("[NEM] [DEBUG]", __line, "Found transaction with message '" + plain + "': " + trxHash);
 
-                model.findOne({message: plain, recipientXEM: recipient}, function(err, channel)
+                model.findOne({message: plain.toUpperCase(), recipientXEM: recipient}, function(err, channel)
                 {
                     if (! err && channel) {
                         // CHANNEL FOUND by Unencrypted Message
