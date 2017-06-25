@@ -335,6 +335,10 @@ var PaymentProcessor = function(chainDataLayer)
                     }
                 });
         }, 300 * 1000);
+
+        // when opening a channel, we should always check whether the Invoice is Paid or 
+        // if the Invoice needs any update.
+        websocketFallbackHandler(self);
     };
 
     /**
