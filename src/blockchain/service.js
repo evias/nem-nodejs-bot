@@ -240,6 +240,17 @@ var service = function(config, logger)
     };
 
     /**
+     * Read blockchain transaction ID from TransactionMetaDataPair
+     *
+     * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
+     * @return {integer}
+     */
+    this.getTransactionId = function(transactionMetaDataPair)
+    {
+        return transactionMetaDataPair.meta.id;
+    };
+
+    /**
      * Read the Transaction Hash from a given TransactionMetaDataPair
      * object (gotten from NEM websockets or API).
      *

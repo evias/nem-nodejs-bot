@@ -48,9 +48,10 @@ var PaymentProcessor = function(chainDataLayer)
     this.nemsocket_ = new api_(this.blockchain_.nemHost + ":" + this.blockchain_.nemPort);
     this.socketById = {};
     this.nemConnection_ = null;
-    this.nemSubscriptions_ = {};
-    this.confirmedTrxes = {};
-    this.unconfirmedTrxes = {};
+    this.nemSubscriptions_  = {};
+    this.confirmedTrxes     = {};
+    this.unconfirmedTrxes   = {};
+    this.transactionPool    = {};
 
     this.options_ = {
         mandatoryMessage: true
@@ -101,33 +102,61 @@ var PaymentProcessor = function(chainDataLayer)
     };
 
     // define fallback in case websocket does not catch transaction!
+    //XXX function documentation
     var websocketFallbackHandler = function(instance)
     {
-        // XXX should also check the Block Height and Last Block to know whether there CAN be new data.
-
-        // read the payment channel recipient's incoming transaction to check whether the Websocket
-        // has missed any (happens maybe only on testnet, but this is for being sure.). The same event
-        // will be emitted in case a transaction is found un-forwarded.
-        instance.blockchain_.nem().com.requests.account.incomingTransactions(instance.blockchain_.endpoint(), instance.blockchain_.getBotReadWallet())
-            .then(function(res)
+        // start recursion for loading more than 25 transactions
+        // the callback will be executed only after reading ALL
+        // transactions (paginating by steps of 25 transactions).
+        instance.fetchPaymentDataFromBlockchain(null, function(instance)
         {
-            var incomings = res;
+            // we can now fetch all DB entries for the fetched transactions
+            // in order to be able to match transactions to Invoices.
+            var query = {
+                status: "confirmed", 
+                transactionHash: {
+                    $in: Object.getOwnPropertyNames(instance.transactionPool)}
+            };
 
-            //DEBUG instance.logger().info("[NEM] [PAY-FALLBACK] [TRY] ", __line, "trying to match " + incomings.length + " transactions from " + instance.blockchain_.getBotReadWallet() + ".");
+            instance.db_.NEMTransactionPool
+                    .find(query, function(err, entries)
+            {
+                if (err) {
+                    instance.logger().error("[NEM] [ERROR] [PAY-FALLBACK]", __line, "Error reading NEMTransactionPool: " + err);
+                    // error happened
+                    return false;
+                }
 
-            for (var i in incomings) {
-                var transaction = incomings[i];
-                var meta    = transaction.meta;
-                var content = transaction.transaction;
-                var trxHash = instance.blockchain_.getTransactionHash(transaction);
+                var unprocessed = instance.transactionPool;
+                if (entries) {
+                    var processed = {};
+                    for (var i = 0; i < entries.length; i++) {
+                        var entry = entries[i];
+                        processed[entry.transactionHash] = true;
+                    }
 
-                instance.db_.NEMTransactionPool.findOne({status: "confirmed", transactionHash: trxHash}, function(err, entry)
-                {
-                    if (err || entry)
-                        // error OR entry FOUND => transaction not processed this time.
+                    var keysPool = Object.getOwnPropertyNames(instance.transactionPool);
+                    var keysDb   = Object.getOwnPropertyNames(processed);
+
+                    unprocessed = keysPool.filter(function(hash, idx)
+                        {
+                            return keysDb.indexOf(hash) < 0;
+                        });
+
+                    if (! unprocessed.length)
                         return false;
+                }
 
-                    var creation  = new instance.db_.NEMTransactionPool({
+                //DEBUG instance.logger().info("[NEM] [PAY-FALLBACK] [TRY] ", __line, "trying to match " + unprocessed.length + " unprocessed transactions from " + instance.blockchain_.getBotReadWallet() + ".");
+
+                for (var j = 0; j < unprocessed.length; j++) {
+                    var trxHash  = unprocessed[j];
+                    var transaction = instance.transactionPool[trxHash];
+
+                    if (! transaction)
+                        continue;
+
+                    var creation = new self.db_.NEMTransactionPool({
                         status: "confirmed",
                         transactionHash: trxHash,
                         createdAt: new Date().valueOf()
@@ -140,9 +169,12 @@ var PaymentProcessor = function(chainDataLayer)
                             websocketChannelTransactionHandler(instance, paymentChannel, trx, "confirmed", "PAY-FALLBACK");
                         }
                     });
-                });
-            }
-        }, function(err) { instance.logger().error("[NEM] [ERROR] [PAY-FALLBACK]", __line, "NIS API incomingTransactions Error: " + err); });
+                }
+            }, 
+            function(err) {
+                instance.logger().error("[NEM] [PAY-FALLBACK] [ERROR] ", __line, "Error reading NEMTransactionPool: " + err);
+            });
+        });
     };
 
     /**
@@ -305,6 +337,8 @@ var PaymentProcessor = function(chainDataLayer)
      */
     this.forwardPaymentUpdates = function(forwardedToSocket, paymentChannel, params)
     {
+        //DEBUG this.logger().info("[BOT] [DEBUG] [" + forwardedToSocket.id + "]", __line, "forwardPaymentUpdates(" + JSON.stringify(params) + ")");
+
         // register socket to make sure also websockets events can be forwarded.
         if (! this.socketById.hasOwnProperty(forwardedToSocket.id)) {
             this.socketById[forwardedToSocket.id] = forwardedToSocket;
@@ -374,6 +408,80 @@ var PaymentProcessor = function(chainDataLayer)
         }
 
         return paymentChannel;
+    };
+
+    /**
+     * This method can be used to read all INCOMING TRANSACTIONS of the 
+     * configured READ BOT. 
+     * 
+     * If any transaction is found to be relevant to the Payment Processor,
+     * it will be acknowledged against the models and in the NEMTransactionPool.
+     * 
+     * @param   {PaymentProcessor}  instance
+     * @param   {integer}           lastTrxRead     NEM Transaction ID
+     * @return  void
+     */
+    this.fetchPaymentDataFromBlockchain = function(lastTrxRead = null, callback = null)
+    {
+        var self = this;
+
+        // read the payment channel recipient's incoming transaction to check whether the Websocket
+        // has missed any (happens maybe only on testnet, but this is for being sure.). The same event
+        // will be emitted in case a transaction is found un-forwarded.
+        self.blockchain_.nem()
+                .com.requests.account.incomingTransactions(self.blockchain_.endpoint(), self.blockchain_.getBotReadWallet(), null, lastTrxRead)
+        .then(function(res)
+        {
+            //DEBUG self.logger().info("[DEBUG]", "[PACNEM CREDITS]", "Result from NIS API account.incomingTransactions: " + JSON.stringify(res));
+            //DEBUG self.logger().info("[DEBUG]", "[PACNEM CREDITS]", "Result from NIS API account.incomingTransactions: " + res.length + " Transactions.");
+
+            var transactions = res;
+
+            lastTrxRead = self.processIncomingTransactions(transactions);
+
+            if (lastTrxRead !== false && 25 == transactions.length) {
+                // recursion..
+                // there may be more transactions in the past (25 transactions
+                // is the limit that the API returns). If we specify a hash or ID it
+                // will look for transactions BEFORE this hash or ID (25 before ID..).
+                // We pass transactions IDs because all NEM nodes support those, hashes are
+                // only supported by a subset of the NEM nodes.
+                self.fetchPaymentDataFromBlockchain(lastTrxRead, callback);
+            }
+
+            if (callback && (lastTrxRead === false || transactions.length < 25)) {
+                // done reading blockchain.
+
+                self.logger().info("[NEM] [PAY-FALLBACK] ", __line, "read a total of " + Object.getOwnPropertyNames(self.transactionPool).length + " transactions from " + self.blockchain_.getBotReadWallet() + ".");
+                callback(self);
+            }
+        }, function(err) { self.logger().error("[NEM] [ERROR] [PAY-FALLBACK]", __line, "NIS API incomingTransactions Error: " + err); });
+    };
+
+    /**
+     * This method will acknowledge a chunk of (maximum) 25 transactions
+     * and return a boolean with `false` when the reading process should 
+     * be stopped. (less than 25 transactions read OR already read transaction)
+     * 
+     * @param   {Array}     transactions    NEM Transactions list
+     * @return  {integer}   Last read NEM Transaction ID
+     */
+    this.processIncomingTransactions = function(transactions)
+    {
+        var lastTrxRead = null;
+        var lastTrxHash = null;
+        for (var i = 0; i < transactions.length; i++) {
+            var transaction = transactions[i];
+            lastTrxRead = this.blockchain_.getTransactionId(transaction);
+            lastTrxHash = this.blockchain_.getTransactionHash(transaction);
+
+            if (this.transactionPool.hasOwnProperty(lastTrxHash))
+                return false;
+
+            this.transactionPool[lastTrxHash] = transaction;
+        }
+
+        return lastTrxRead;
     };
 
     var self = this;
