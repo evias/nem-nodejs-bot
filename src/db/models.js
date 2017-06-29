@@ -77,6 +77,7 @@ var NEMBotDB = function(config, io, chainDataLayer)
         hasPayment: {type: Boolean, default: false},
         isPaid: {type: Boolean, default: false},
         paidAt: {type: Number, min: 0},
+        mosaicSlug: {type: String, default: "nem:xem"},
         createdAt: {type: Number, min: 0},
         updatedAt: {type: Number, min: 0}
     });
@@ -272,6 +273,14 @@ var NEMBotDB = function(config, io, chainDataLayer)
                 // is changed with the ```status``` variable)
                 return callback(false);
             }
+
+//XXX allow payments with different Mosaics than nem:xem
+// according to the `channel`.`mosaicSlug` field we might need to check
+// mosaics contents instead of `transaction`.`amount`.
+// NEMPaymentChannels should not change the amounts stored, the divisibility
+// of the Mosaic used for payments will be read from the blockchain when it 
+// is needed.
+//XXX
 
             // now "acknowledging" transaction: this means we will save the transaction amount
             // in the field corresponding to the given status. the unconfirmed amount cannot be trusted.

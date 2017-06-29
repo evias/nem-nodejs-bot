@@ -275,7 +275,7 @@ var service = function(config, logger)
      * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
      * @return {[type]}                         [description]
      */
-    this.getTransactionAmount = function(transactionMetaDataPair)
+    this.getTransactionAmount = function(transactionMetaDataPair, mosaicSlug = 'nem:xem', divisibility = 6)
     {
         var meta    = transactionMetaDataPair.meta;
         var content = transactionMetaDataPair.transaction;
@@ -284,28 +284,34 @@ var service = function(config, logger)
         var realContent = isMultiSig ? content.otherTrans : content;
         var isMosaic    = realContent.mosaics && realContent.mosaics.length > 0;
 
+        var lookupNS  = mosaicSlug.replace(/:[^:]+$/, "");
+        var lookupMos = mosaicSlug.replace(/^[^:]+:/, "");
+
         if (isMosaic) {
             // read mosaics to find XEM, `content.amount` is now a multiplier!
 
-            var multiplier = realContent.amount / 1000000; // from microXEM to XEM
+            var multiplier = realContent.amount / Math.pow(10, divisibility); // from microXEM to XEM
             for (var i in realContent.mosaics) {
                 var mosaic = realContent.mosaics[i];
-                var isXEM  = mosaic.mosaicId.namespaceId == "nem" && mosaic.mosaicId.name == "xem";
+                var isLookupMosaic  = mosaic.mosaicId.namespaceId == lookupNS 
+                                    && mosaic.mosaicId.name == lookupMos;
 
-                if (!isXEM)
+                if (!isLookupMosaic)
                     continue;
 
                 // XEM divisibility is 10^6
-                return (multiplier * mosaic.quantity).toFixed(6);
+                return (multiplier * mosaic.quantity).toFixed(divisibility);
             }
 
             // no XEM in transaction.
             return 0;
         }
-        else {
-            // not a mosaic transer, `content.amount` is our XEM amount.
-            return realContent.amount;
-        }
+
+        if (mosaicSlug !== 'nem:xem')
+            return 0;
+
+        // not a mosaic transer, `content.amount` is our XEM amount.
+        return realContent.amount;
     };
 
     /**
