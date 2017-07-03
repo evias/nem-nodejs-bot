@@ -42,7 +42,6 @@
         this.backend_ = null;
         this.channel_ = null;
         this.params_ = null;
-        this.nemsocket_ = null;
         this.caughtTrxs_ = null;
         this.nemsocket_ = new api_(this.blockchain_.nemHost + ":" + this.blockchain_.nemPort);
         this.socketById = {};
@@ -111,59 +110,58 @@
                     }
                 };
 
-                instance.db_.NEMTransactionPool
-                    .find(query, function(err, entries) {
-                            if (err) {
-                                instance.logger().error("[NEM] [ERROR] [PAY-FALLBACK]", __line, "Error reading NEMTransactionPool: " + err);
-                                // error happened
+                instance.db_.NEMTransactionPool.find(query, function(err, entries) {
+                        if (err) {
+                            instance.logger().error("[NEM] [ERROR] [PAY-FALLBACK]", __line, "Error reading NEMTransactionPool: " + err);
+                            // error happened
+                            return false;
+                        }
+
+                        var unprocessed = instance.transactionPool;
+                        if (entries) {
+                            var processed = {};
+                            for (var i = 0; i < entries.length; i++) {
+                                var entry = entries[i];
+                                processed[entry.transactionHash] = true;
+                            }
+
+                            var keysPool = Object.getOwnPropertyNames(instance.transactionPool);
+                            var keysDb = Object.getOwnPropertyNames(processed);
+
+                            unprocessed = keysPool.filter(function(hash, idx) {
+                                return keysDb.indexOf(hash) < 0;
+                            });
+
+                            if (!unprocessed.length)
                                 return false;
-                            }
+                        }
 
-                            var unprocessed = instance.transactionPool;
-                            if (entries) {
-                                var processed = {};
-                                for (var i = 0; i < entries.length; i++) {
-                                    var entry = entries[i];
-                                    processed[entry.transactionHash] = true;
+                        //DEBUG instance.logger().info("[NEM] [PAY-FALLBACK] [TRY] ", __line, "trying to match " + unprocessed.length + " unprocessed transactions from " + instance.blockchain_.getBotReadWallet() + ".");
+
+                        for (var j = 0; j < unprocessed.length; j++) {
+                            var trxHash = unprocessed[j];
+                            var transaction = instance.transactionPool[trxHash];
+
+                            if (!transaction)
+                                continue;
+
+                            var creation = new self.db_.NEMTransactionPool({
+                                status: "confirmed",
+                                transactionHash: trxHash,
+                                createdAt: new Date().valueOf()
+                            });
+                            creation.save();
+
+                            instance.db_.NEMPaymentChannel.matchTransactionToChannel(instance.blockchain_, transaction, function(paymentChannel, trx) {
+                                if (paymentChannel !== false) {
+                                    websocketChannelTransactionHandler(instance, paymentChannel, trx, "confirmed", "PAY-FALLBACK");
                                 }
-
-                                var keysPool = Object.getOwnPropertyNames(instance.transactionPool);
-                                var keysDb = Object.getOwnPropertyNames(processed);
-
-                                unprocessed = keysPool.filter(function(hash, idx) {
-                                    return keysDb.indexOf(hash) < 0;
-                                });
-
-                                if (!unprocessed.length)
-                                    return false;
-                            }
-
-                            //DEBUG instance.logger().info("[NEM] [PAY-FALLBACK] [TRY] ", __line, "trying to match " + unprocessed.length + " unprocessed transactions from " + instance.blockchain_.getBotReadWallet() + ".");
-
-                            for (var j = 0; j < unprocessed.length; j++) {
-                                var trxHash = unprocessed[j];
-                                var transaction = instance.transactionPool[trxHash];
-
-                                if (!transaction)
-                                    continue;
-
-                                var creation = new self.db_.NEMTransactionPool({
-                                    status: "confirmed",
-                                    transactionHash: trxHash,
-                                    createdAt: new Date().valueOf()
-                                });
-                                creation.save();
-
-                                instance.db_.NEMPaymentChannel.matchTransactionToChannel(instance.blockchain_, transaction, function(paymentChannel, trx) {
-                                    if (paymentChannel !== false) {
-                                        websocketChannelTransactionHandler(instance, paymentChannel, trx, "confirmed", "PAY-FALLBACK");
-                                    }
-                                });
-                            }
-                        },
-                        function(err) {
-                            instance.logger().error("[NEM] [PAY-FALLBACK] [ERROR] ", __line, "Error reading NEMTransactionPool: " + err);
-                        });
+                            });
+                        }
+                    },
+                    function(err) {
+                        instance.logger().error("[NEM] [PAY-FALLBACK] [ERROR] ", __line, "Error reading NEMTransactionPool: " + err);
+                    });
             });
         };
 
@@ -213,18 +211,6 @@
                     self.logger()
                         .error("[NEM] [ERROR] [PAY-SOCKET]", __line,
                             "Error Happened: " + message.body);
-                });
-
-                // NEM Websocket new blocks Listener
-                self.nemSubscriptions_["/blocks/new"] = self.nemsocket_.subscribeWS("/blocks/new", function(message) {
-                    var parsed = JSON.parse(message.body);
-                    self.logger().info("[NEM] [PAY-SOCKET]", __line, 'new_block(' + JSON.stringify(parsed) + ')');
-
-                    var block = new self.db_.NEMBlockHeight({
-                        blockHeight: parsed.height,
-                        createdAt: new Date().valueOf()
-                    });
-                    block.save();
                 });
 
                 var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotReadWallet();
@@ -334,7 +320,7 @@
             var self = this;
 
             // fallback handler queries the blockchain every 5 minutes
-            // ONLY IN CASE THE BLOCKS WEBSOCKET HAS NOT FILLE DATA FOR
+            // ONLY IN CASE THE BLOCKS WEBSOCKET HAS NOT FILLED DATA FOR
             // 5 MINUTES ANYMORE (meaning the websocket connection is buggy).
             var fallbackInterval = setInterval(function() {
                 self.db_.NEMBlockHeight.find({}, [], { limit: 1, sort: { createdAt: -1 } }, function(err, lastBlock) {
