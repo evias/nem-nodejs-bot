@@ -47,10 +47,17 @@
         };
 
         /**
-         * Open the connection to a Websocket to the NEM Blockchain endpoint configured
-         * through ```this.blockchain_```.
-         *
-         * @return {[type]} [description]
+         * Configure the BlocksAuditor websocket connections. This class
+         * will connect to following websocket channels:
+         * 
+         * - /errors
+         * - /blocks/new
+         * 
+         * Standard API Disconnection is handled in the `websocketErrorHandler`
+         * closure and will issue an automatic reconnection. This process happens
+         * approximately every 10 minutes.
+         * 
+         * @return  {BlocksAuditor}
          */
         this.connectBlockchainSocket = function() {
             var self = this;
@@ -95,6 +102,7 @@
                 });
 
                 // NEM Websocket new blocks Listener
+                self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'subscribing to /blocks/new.');
                 self.nemSubscriptions_["/blocks/new"] = self.nemsocket_.subscribeWS("/blocks/new", function(message) {
                     var parsed = JSON.parse(message.body);
                     self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'new_block(' + JSON.stringify(parsed) + ')');
@@ -111,6 +119,18 @@
             return self;
         };
 
+        /**
+         * This method should register an interval to run every *10 minutes*
+         * which will check the date of the last saved `NEMBlockHeight` entry.
+         * If the block entry is older than 5 minutes, the blockchain endpoint
+         * will be switched automatically.
+         * 
+         * After this has been, you will usually need to refresh your Websocket
+         * connections as shows the example use case in server.js.
+         * 
+         * @param   {Function}  callback
+         * @return  {BlocksAuditor}
+         */
         this.registerBlockDelayAuditor = function(callback) {
             var self = this;
 

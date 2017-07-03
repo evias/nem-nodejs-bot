@@ -202,6 +202,18 @@
             return this.cliSocketIo_;
         };
 
+        /**
+         * This method initializes the BlocksAuditor instance 
+         * for the running bot.
+         * 
+         * The returned object is responsible for reading Blocks
+         * of the Blockchain and maintaining a Timed History of 
+         * latest read data. This allows the current bot to identify
+         * broken Websockets channel subscription and re-initiate
+         * subscriptions on different nodes.
+         * 
+         * @return  {BlocksAuditor}
+         */
         this.getBlocksAuditor = function() {
             if (!this.blocksAuditor_) {
                 this.blocksAuditor_ = new BlocksAuditor(this);
@@ -210,6 +222,20 @@
             return this.blocksAuditor_;
         };
 
+        /**
+         * This method initializes the PaymentProcessor instance 
+         * for the running bot. 
+         * 
+         * The returned object is responsible for Payment Processing.
+         * 
+         * The Payment processor can be configured to Forward Payment
+         * Updates for Invoices. The implemented class shows a simple 
+         * example of Payment Processing using always the same address
+         * and a pre-defined unique message for the identifications of 
+         * Invoices.
+         * 
+         * @return  {PaymentProcessor}
+         */
         this.getPaymentProcessor = function() {
             if (!this.paymentProcessor_) {
                 this.paymentProcessor_ = new PaymentProcessor(this);
@@ -218,6 +244,15 @@
             return this.paymentProcessor_;
         };
 
+        /**
+         * This method initializes the MultisigCosignatory instance 
+         * for the running bot. 
+         * 
+         * The returned object is responsible for transactions co-signing
+         * in case the Bot is configured in Sign-Mode.
+         * 
+         * @return  {MultisigCosignatory}
+         */
         this.getMultisigCosignatory = function() {
             if (!this.multisigCosignatory_) {
                 this.multisigCosignatory_ = new MultisigCosignatory(this);
@@ -226,6 +261,15 @@
             return this.multisigCosignatory_;
         };
 
+        /**
+         * The autoSwitchNode() method will automatically select the 
+         * next NEM endpoint Host and Port from the configuration file.
+         * 
+         * This method is called whenever the websocket connection can't 
+         * read blocks or hasn't read blocks in more than 5 minutes.
+         * 
+         * @return  {service}
+         */
         this.autoSwitchNode = function() {
 
             var currentHost = this.node_.host;
@@ -244,6 +288,7 @@
             this.node_ = this.nem_.model.objects.create("endpoint")(nextHost, nextPort);
             this.nemHost = nextHost;
             this.nemPort = nextPort;
+            return this;
         };
 
         /**
