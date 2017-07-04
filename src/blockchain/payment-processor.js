@@ -43,7 +43,6 @@
         this.channel_ = null;
         this.params_ = null;
         this.caughtTrxs_ = null;
-        this.nemsocket_ = new api_(this.blockchain_.nemHost + ":" + this.blockchain_.nemPort);
         this.socketById = {};
         this.nemConnection_ = null;
         this.nemSubscriptions_ = {};
@@ -174,6 +173,10 @@
         this.connectBlockchainSocket = function() {
             var self = this;
 
+            // initialize the socket connection with the current
+            // blockchain instance connected endpoint
+            self.nemsocket_ = new api_(self.blockchain_.getNetwork().host + ":" + self.blockchain_.getNetwork().port);
+
             // define helper for websocket error handling, the NEM Blockchain Socket
             // should be alive as long as the bot is running so we will always try
             // to reconnect, unless the bot has been stopped from running or has crashed.
@@ -200,85 +203,90 @@
             self.nemConnection_ = self.nemsocket_.connectWS(function() {
                 // on connection we subscribe only to the /errors websocket.
                 // PaymentProcessor will open
-
-                self.logger()
-                    .info("[NEM] [CONNECT]", __line,
-                        "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
-
-                // NEM Websocket Error listening
-                self.logger().info("[NEM] [PAY-SOCKET]", __line, 'subscribing to /errors.');
-                self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
+                try {
                     self.logger()
-                        .error("[NEM] [ERROR] [PAY-SOCKET]", __line,
-                            "Error Happened: " + message.body);
-                });
+                        .info("[NEM] [CONNECT]", __line,
+                            "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
 
-                var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotReadWallet();
-                var confirmedUri = "/transactions/" + self.blockchain_.getBotReadWallet();
-                var sendUri = "/w/api/account/transfers/all";
+                    // NEM Websocket Error listening
+                    self.logger().info("[NEM] [PAY-SOCKET]", __line, 'subscribing to /errors.');
+                    self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
+                        self.logger()
+                            .error("[NEM] [ERROR] [PAY-SOCKET]", __line,
+                                "Error Happened: " + message.body);
+                    });
 
-                // NEM Websocket unconfirmed transactions Listener
-                self.logger().info("[NEM] [PAY-SOCKET]", __line, 'subscribing to /unconfirmed/' + self.blockchain_.getBotReadWallet() + '.');
-                self.nemSubscriptions_[unconfirmedUri] = self.nemsocket_.subscribeWS(unconfirmedUri, function(message) {
-                    var parsed = JSON.parse(message.body);
-                    self.logger().info("[NEM] [PAY-SOCKET]", __line, 'unconfirmed(' + JSON.stringify(parsed) + ')');
+                    var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotReadWallet();
+                    var confirmedUri = "/transactions/" + self.blockchain_.getBotReadWallet();
+                    var sendUri = "/w/api/account/transfers/all";
 
-                    var transactionData = JSON.parse(message.body);
-                    var transaction = transactionData.transaction;
-                    var trxHash = self.blockchain_.getTransactionHash(transactionData);
+                    // NEM Websocket unconfirmed transactions Listener
+                    self.logger().info("[NEM] [PAY-SOCKET]", __line, 'subscribing to /unconfirmed/' + self.blockchain_.getBotReadWallet() + '.');
+                    self.nemSubscriptions_[unconfirmedUri] = self.nemsocket_.subscribeWS(unconfirmedUri, function(message) {
+                        var parsed = JSON.parse(message.body);
+                        self.logger().info("[NEM] [PAY-SOCKET]", __line, 'unconfirmed(' + JSON.stringify(parsed) + ')');
 
-                    self.db_.NEMTransactionPool.findOne({ transactionHash: trxHash }, function(err, entry) {
-                        if (err || entry)
-                        // error OR entry FOUND => transaction not processed this time.
-                            return false;
+                        var transactionData = JSON.parse(message.body);
+                        var transaction = transactionData.transaction;
+                        var trxHash = self.blockchain_.getTransactionHash(transactionData);
 
-                        var creation = new self.db_.NEMTransactionPool({
-                            status: "unconfirmed",
-                            transactionHash: trxHash,
-                            createdAt: new Date().valueOf()
-                        });
-                        creation.save();
+                        self.db_.NEMTransactionPool.findOne({ transactionHash: trxHash }, function(err, entry) {
+                            if (err || entry)
+                            // error OR entry FOUND => transaction not processed this time.
+                                return false;
 
-                        self.db_.NEMPaymentChannel.matchTransactionToChannel(self.blockchain_, transactionData, function(paymentChannel) {
-                            if (paymentChannel !== false) {
-                                websocketChannelTransactionHandler(self, paymentChannel, transactionData, "unconfirmed", "SOCKET");
-                            }
+                            var creation = new self.db_.NEMTransactionPool({
+                                status: "unconfirmed",
+                                transactionHash: trxHash,
+                                createdAt: new Date().valueOf()
+                            });
+                            creation.save();
+
+                            self.db_.NEMPaymentChannel.matchTransactionToChannel(self.blockchain_, transactionData, function(paymentChannel) {
+                                if (paymentChannel !== false) {
+                                    websocketChannelTransactionHandler(self, paymentChannel, transactionData, "unconfirmed", "SOCKET");
+                                }
+                            });
                         });
                     });
-                });
 
-                // NEM Websocket confirmed transactions Listener
-                self.logger().info("[NEM] [PAY-SOCKET]", __line, 'subscribing to /transactions/' + self.blockchain_.getBotReadWallet() + '.');
-                self.nemSubscriptions_[confirmedUri] = self.nemsocket_.subscribeWS(confirmedUri, function(message) {
-                    var parsed = JSON.parse(message.body);
-                    self.logger().info("[NEM] [PAY-SOCKET]", __line, 'transactions(' + JSON.stringify(parsed) + ')');
+                    // NEM Websocket confirmed transactions Listener
+                    self.logger().info("[NEM] [PAY-SOCKET]", __line, 'subscribing to /transactions/' + self.blockchain_.getBotReadWallet() + '.');
+                    self.nemSubscriptions_[confirmedUri] = self.nemsocket_.subscribeWS(confirmedUri, function(message) {
+                        var parsed = JSON.parse(message.body);
+                        self.logger().info("[NEM] [PAY-SOCKET]", __line, 'transactions(' + JSON.stringify(parsed) + ')');
 
-                    var transactionData = JSON.parse(message.body);
-                    var transaction = transactionData.transaction;
-                    var trxHash = self.blockchain_.getTransactionHash(transactionData);
+                        var transactionData = JSON.parse(message.body);
+                        var transaction = transactionData.transaction;
+                        var trxHash = self.blockchain_.getTransactionHash(transactionData);
 
-                    // this time also include "status" filtering.
-                    self.db_.NEMTransactionPool.findOne({ status: "confirmed", transactionHash: trxHash }, function(err, entry) {
-                        if (err || entry)
-                        // error OR entry FOUND => transaction not processed this time.
-                            return false;
+                        // this time also include "status" filtering.
+                        self.db_.NEMTransactionPool.findOne({ status: "confirmed", transactionHash: trxHash }, function(err, entry) {
+                            if (err || entry)
+                            // error OR entry FOUND => transaction not processed this time.
+                                return false;
 
-                        var creation = new self.db_.NEMTransactionPool({
-                            status: "confirmed",
-                            transactionHash: trxHash,
-                            createdAt: new Date().valueOf()
-                        });
-                        creation.save();
+                            var creation = new self.db_.NEMTransactionPool({
+                                status: "confirmed",
+                                transactionHash: trxHash,
+                                createdAt: new Date().valueOf()
+                            });
+                            creation.save();
 
-                        self.db_.NEMPaymentChannel.matchTransactionToChannel(self.blockchain_, transactionData, function(paymentChannel) {
-                            if (paymentChannel !== false) {
-                                websocketChannelTransactionHandler(self, paymentChannel, transactionData, "confirmed", "SOCKET");
-                            }
+                            self.db_.NEMPaymentChannel.matchTransactionToChannel(self.blockchain_, transactionData, function(paymentChannel) {
+                                if (paymentChannel !== false) {
+                                    websocketChannelTransactionHandler(self, paymentChannel, transactionData, "confirmed", "SOCKET");
+                                }
+                            });
                         });
                     });
-                });
 
-                self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotReadWallet() }));
+                    self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotReadWallet() }));
+
+                } catch (e) {
+                    // On Exception, restart connection process
+                    self.connectBlockchainSocket();
+                }
 
             }, websocketErrorHandler);
 
