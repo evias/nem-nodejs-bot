@@ -156,7 +156,7 @@
                         self.logger().warn("[NEM] [AUDIT-SOCKET]", __line, "Socket connection lost with node: " + JSON.stringify(self.blockchain_.node_.host) + ".. Now hot-switching Node.");
                         self.blockchain_.autoSwitchNode();
 
-                        if (callback) return callback(self);
+                        if (callback) return callback(self.blockchain_);
                     }
 
                     return false;
