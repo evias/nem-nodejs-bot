@@ -278,7 +278,7 @@
                 .getBlocksAuditor()
                 .connectBlockchainSocket()
                 .registerBlockDelayAuditor(function(blockchain) {
-                    self.blockchain = blockchain;
+                    self.blockchain_ = blockchain;
                     self.initSocketProxy();
                 });
         };
