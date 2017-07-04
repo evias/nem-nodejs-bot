@@ -27,7 +27,7 @@
         "mongoose": "~4.9.3",
         "mongoose-increment": "~0.6.1",
 
-        "nem-sdk": "https://github.com/evias/NEM-sdk.git",
+        "nem-sdk": "https://github.com/evias/NEM-sdk.git#dev-fee_structure",
         "nem-api": "https://github.com/evias/nem-api.git"
     },
     "scripts": {
