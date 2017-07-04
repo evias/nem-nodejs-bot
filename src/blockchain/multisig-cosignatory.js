@@ -43,9 +43,7 @@
         this.backend_ = null;
         this.channel_ = null;
         this.params_ = null;
-        this.nemsocket_ = null;
         this.caughtTrxs_ = null;
-        this.nemsocket_ = new api_(this.blockchain_.nemHost + ":" + this.blockchain_.nemPort);
         this.nemConnection_ = null;
         this.nemSubscriptions_ = {};
 
@@ -179,6 +177,10 @@
         this.connectBlockchainSocket = function() {
             var self = this;
 
+            // initialize the socket connection with the current
+            // blockchain instance connected endpoint
+            self.nemsocket_ = new api_(self.blockchain_.getNetwork().host + ":" + self.blockchain_.getNetwork().port);
+
             // define helper for websocket error handling. The NEM Blockchain Socket
             // should be alive as long as the bot is running so we will always try
             // to reconnect, unless the bot has been stopped from running or has crashed.
@@ -187,18 +189,14 @@
                 if (regexp_LostConn.test(error)) {
                     // connection lost, re-connect
 
-                    self.logger()
-                        .warn("[NEM] [DROP]", __line,
-                            "Connection lost with node: " + JSON.stringify(self.nemsocket_.socketpt) + ".. Now re-connecting.");
-
+                    self.logger().warn("[NEM] [DROP]", __line, "Connection lost with node: " + JSON.stringify(self.nemsocket_.socketpt) + ".. Now re-connecting.");
                     self.connectBlockchainSocket();
                     return true;
                 }
                 //XXX ECONNREFUSED => switch node
 
                 // uncaught error happened
-                self.logger()
-                    .error("[NEM] [ERROR]", __line, "Uncaught Error: " + error);
+                self.logger().error("[NEM] [ERROR]", __line, "Uncaught Error: " + error);
             };
 
             // Connect to NEM Blockchain Websocket now
@@ -206,45 +204,46 @@
                 // on connection we subscribe only to the /errors websocket.
                 // MultisigCosignatory will open
 
-                self.logger()
-                    .info("[NEM] [CONNECT]", __line,
-                        "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
+                try {
+                    self.logger().info("[NEM] [CONNECT]", __line, "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
 
-                // NEM Websocket Error listening
-                self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'subscribing to /errors.');
-                self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
-                    self.logger()
-                        .error("[NEM] [ERROR] [SIGN-SOCKET]", __line,
-                            "Error Happened: " + message.body);
-                });
+                    // NEM Websocket Error listening
+                    self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'subscribing to /errors.');
+                    self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
+                        self.logger().error("[NEM] [ERROR] [SIGN-SOCKET]", __line, "Error Happened: " + message.body);
+                    });
 
-                var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotSignMultisigWallet();
-                var sendUri = "/w/api/account/transfers/all";
+                    var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotSignMultisigWallet();
+                    var sendUri = "/w/api/account/transfers/all";
 
-                // NEM Websocket unconfirmed transactions Listener
-                self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'subscribing to ' + unconfirmedUri + '.');
-                self.nemSubscriptions_[unconfirmedUri] = self.nemsocket_.subscribeWS(unconfirmedUri, function(message) {
-                    var parsed = JSON.parse(message.body);
-                    self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'unconfirmed(' + JSON.stringify(parsed) + ')');
+                    // NEM Websocket unconfirmed transactions Listener
+                    self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'subscribing to ' + unconfirmedUri + '.');
+                    self.nemSubscriptions_[unconfirmedUri] = self.nemsocket_.subscribeWS(unconfirmedUri, function(message) {
+                        var parsed = JSON.parse(message.body);
+                        self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'unconfirmed(' + JSON.stringify(parsed) + ')');
 
-                    var transactionData = JSON.parse(message.body);
-                    var transaction = transactionData.transaction;
-                    var trxHash = self.blockchain_.getTransactionHash(transactionData);
+                        var transactionData = JSON.parse(message.body);
+                        var transaction = transactionData.transaction;
+                        var trxHash = self.blockchain_.getTransactionHash(transactionData);
 
-                    //XXX implement real verification of transaction type. In case it is a multisig
-                    //    it should always check the transaction.otherTrans.type value.
-                    //XXX currently only multisig transaction can be signed with this bot.
+                        //XXX implement real verification of transaction type. In case it is a multisig
+                        //    it should always check the transaction.otherTrans.type value.
+                        //XXX currently only multisig transaction can be signed with this bot.
 
-                    if (transaction.type != chainDataLayer.nem().model.transactionTypes.multisigTransaction) {
-                        // we are interested only in multisig transactions.
-                        return false;
-                    }
+                        if (transaction.type != chainDataLayer.nem().model.transactionTypes.multisigTransaction) {
+                            // we are interested only in multisig transactions.
+                            return false;
+                        }
 
-                    automaticTransactionSigningHandler(self, transactionData);
-                });
+                        automaticTransactionSigningHandler(self, transactionData);
+                    });
 
-                self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotSignWallet() }));
+                    self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotSignWallet() }));
 
+                } catch (e) {
+                    // On Exception, restart connection process
+                    self.connectBlockchainSocket();
+                }
             }, websocketErrorHandler);
 
             return self.nemsocket_;

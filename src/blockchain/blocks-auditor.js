@@ -34,7 +34,6 @@
         this.blockchain_ = chainDataLayer;
         this.db_ = this.blockchain_.getDatabaseAdapter();
 
-        this.nemsocket_ = new api_(this.blockchain_.nemHost + ":" + this.blockchain_.nemPort);
         this.nemConnection_ = null;
         this.nemSubscriptions_ = {};
 
@@ -47,13 +46,24 @@
         };
 
         /**
-         * Open the connection to a Websocket to the NEM Blockchain endpoint configured
-         * through ```this.blockchain_```.
-         *
-         * @return {[type]} [description]
+         * Configure the BlocksAuditor websocket connections. This class
+         * will connect to following websocket channels:
+         * 
+         * - /errors
+         * - /blocks/new
+         * 
+         * Standard API Disconnection is handled in the `websocketErrorHandler`
+         * closure and will issue an automatic reconnection. This process happens
+         * approximately every 10 minutes.
+         * 
+         * @return  {BlocksAuditor}
          */
         this.connectBlockchainSocket = function() {
             var self = this;
+
+            // initialize the socket connection with the current
+            // blockchain instance connected endpoint
+            self.nemsocket_ = new api_(self.blockchain_.getNetwork().host + ":" + self.blockchain_.getNetwork().port);
 
             // define helper for websocket error handling, the NEM Blockchain Socket
             // should be alive as long as the bot is running so we will always try
@@ -82,35 +92,54 @@
                 // on connection we subscribe only to the /errors websocket.
                 // BlocksAuditor will open
 
-                self.logger()
-                    .info("[NEM] [CONNECT]", __line,
-                        "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
-
-                // NEM Websocket Error listening
-                self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'subscribing to /errors.');
-                self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
+                try {
                     self.logger()
-                        .error("[NEM] [ERROR] [AUDIT-SOCKET]", __line,
-                            "Error Happened: " + message.body);
-                });
+                        .info("[NEM] [CONNECT]", __line,
+                            "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
 
-                // NEM Websocket new blocks Listener
-                self.nemSubscriptions_["/blocks/new"] = self.nemsocket_.subscribeWS("/blocks/new", function(message) {
-                    var parsed = JSON.parse(message.body);
-                    self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'new_block(' + JSON.stringify(parsed) + ')');
-
-                    var block = new self.db_.NEMBlockHeight({
-                        blockHeight: parsed.height,
-                        createdAt: new Date().valueOf()
+                    // NEM Websocket Error listening
+                    self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'subscribing to /errors.');
+                    self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
+                        self.logger()
+                            .error("[NEM] [ERROR] [AUDIT-SOCKET]", __line,
+                                "Error Happened: " + message.body);
                     });
-                    block.save();
-                });
+
+                    // NEM Websocket new blocks Listener
+                    self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'subscribing to /blocks/new.');
+                    self.nemSubscriptions_["/blocks/new"] = self.nemsocket_.subscribeWS("/blocks/new", function(message) {
+                        var parsed = JSON.parse(message.body);
+                        self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'new_block(' + JSON.stringify(parsed) + ')');
+
+                        var block = new self.db_.NEMBlockHeight({
+                            blockHeight: parsed.height,
+                            createdAt: new Date().valueOf()
+                        });
+                        block.save();
+                    });
+
+                } catch (e) {
+                    // On Exception, restart connection process
+                    self.connectBlockchainSocket();
+                }
 
             }, websocketErrorHandler);
 
             return self;
         };
 
+        /**
+         * This method should register an interval to run every *10 minutes*
+         * which will check the date of the last saved `NEMBlockHeight` entry.
+         * If the block entry is older than 5 minutes, the blockchain endpoint
+         * will be switched automatically.
+         * 
+         * After this has been, you will usually need to refresh your Websocket
+         * connections as shows the example use case in server.js.
+         * 
+         * @param   {Function}  callback
+         * @return  {BlocksAuditor}
+         */
         this.registerBlockDelayAuditor = function(callback) {
             var self = this;
 
