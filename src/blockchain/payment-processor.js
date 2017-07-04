@@ -186,8 +186,7 @@
                     // connection lost, re-connect
 
                     self.logger()
-                        .warn("[NEM] [DROP]", __line,
-                            "Connection lost with node: " + JSON.stringify(self.nemsocket_.socketpt) + ".. Now re-connecting.");
+                        .warn("[NEM] [PAY-SOCKET] [DROP]", __line, "Connection lost with node: " + JSON.stringify(self.nemsocket_.socketpt) + ".. Now re-connecting.");
 
                     self.connectBlockchainSocket();
                     return true;
@@ -196,7 +195,7 @@
 
                 // uncaught error happened
                 self.logger()
-                    .error("[NEM] [ERROR]", __line, "Uncaught Error: " + error);
+                    .error("[NEM] [PAY-SOCKET] [ERROR]", __line, "Uncaught Error: " + error);
             };
 
             // Connect to NEM Blockchain Websocket now
@@ -205,14 +204,14 @@
                 // PaymentProcessor will open
                 try {
                     self.logger()
-                        .info("[NEM] [CONNECT]", __line,
+                        .info("[NEM] [PAY-SOCKET] [CONNECT]", __line,
                             "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
 
                     // NEM Websocket Error listening
                     self.logger().info("[NEM] [PAY-SOCKET]", __line, 'subscribing to /errors.');
                     self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
                         self.logger()
-                            .error("[NEM] [ERROR] [PAY-SOCKET]", __line,
+                            .error("[NEM] [PAY-SOCKET] [ERROR]", __line,
                                 "Error Happened: " + message.body);
                     });
 

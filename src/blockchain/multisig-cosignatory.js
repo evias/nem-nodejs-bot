@@ -189,14 +189,14 @@
                 if (regexp_LostConn.test(error)) {
                     // connection lost, re-connect
 
-                    self.logger().warn("[NEM] [DROP]", __line, "Connection lost with node: " + JSON.stringify(self.nemsocket_.socketpt) + ".. Now re-connecting.");
+                    self.logger().warn("[NEM] [SIGN-SOCKET] [DROP]", __line, "Connection lost with node: " + JSON.stringify(self.nemsocket_.socketpt) + ".. Now re-connecting.");
                     self.connectBlockchainSocket();
                     return true;
                 }
                 //XXX ECONNREFUSED => switch node
 
                 // uncaught error happened
-                self.logger().error("[NEM] [ERROR]", __line, "Uncaught Error: " + error);
+                self.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Uncaught Error: " + error);
             };
 
             // Connect to NEM Blockchain Websocket now
@@ -205,12 +205,12 @@
                 // MultisigCosignatory will open
 
                 try {
-                    self.logger().info("[NEM] [CONNECT]", __line, "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
+                    self.logger().info("[NEM] [SIGN-SOCKET] [CONNECT]", __line, "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
 
                     // NEM Websocket Error listening
                     self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'subscribing to /errors.');
                     self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
-                        self.logger().error("[NEM] [ERROR] [SIGN-SOCKET]", __line, "Error Happened: " + message.body);
+                        self.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Error Happened: " + message.body);
                     });
 
                     var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotSignMultisigWallet();
@@ -242,6 +242,7 @@
 
                 } catch (e) {
                     // On Exception, restart connection process
+                    self.logger().error("[NEM] [ERROR]", __line, "Websocket Subscription Error: " + e);
                     self.connectBlockchainSocket();
                 }
             }, websocketErrorHandler);
