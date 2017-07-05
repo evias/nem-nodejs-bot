@@ -408,7 +408,8 @@
             self.blockchain_.nem().com.requests
                 .transaction.announce(self.blockchain_.endpoint(), broadcastable)
                 .then(function(res) {
-                        res = res.data;
+                        //DEBUG self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'Transaction Annouce Response: "' + JSON.stringify(res));
+
                         if (res.code >= 2) {
                             self.blockchain_.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Error announcing transaction: " + res.message);
                         } else if ("SUCCESS" == res.message) {
