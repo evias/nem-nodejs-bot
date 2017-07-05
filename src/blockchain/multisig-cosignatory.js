@@ -40,6 +40,7 @@
         this.blockchain_ = chainDataLayer;
         this.db_ = this.blockchain_.getDatabaseAdapter();
 
+        this.nemsocket_ = null;
         this.backend_ = null;
         this.channel_ = null;
         this.params_ = null;
@@ -144,7 +145,7 @@
                 .requests.account.transactions
                 .unconfirmed(instance.blockchain_.endpoint(), instance.blockchain_.getBotSignMultisigWallet())
                 .then(function(res) {
-                    var unconfirmed = res;
+                    var unconfirmed = res.data;
 
                     instance.logger().info("[NEM] [SIGN-FALLBACK] [TRY] ", __line, "will now try to sign " + unconfirmed.length + " transactions with " + instance.blockchain_.getBotSignWallet() + " for " + instance.blockchain_.getBotSignMultisigWallet() + ".");
 
@@ -407,6 +408,7 @@
             self.blockchain_.nem().com.requests
                 .transaction.announce(self.blockchain_.endpoint(), broadcastable)
                 .then(function(res) {
+                        res = res.data;
                         if (res.code >= 2) {
                             self.blockchain_.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Error announcing transaction: " + res.message);
                         } else if ("SUCCESS" == res.message) {

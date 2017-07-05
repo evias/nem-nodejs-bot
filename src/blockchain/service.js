@@ -212,10 +212,11 @@
          * broken Websockets channel subscription and re-initiate
          * subscriptions on different nodes.
          * 
+         * @param   {Boolean}   reset   Whether to reset the instance
          * @return  {BlocksAuditor}
          */
-        this.getBlocksAuditor = function() {
-            if (!this.blocksAuditor_) {
+        this.getBlocksAuditor = function(reset = false) {
+            if (!this.blocksAuditor_ || reset === true) {
                 this.blocksAuditor_ = new BlocksAuditor(this);
             }
 
@@ -234,10 +235,11 @@
          * and a pre-defined unique message for the identifications of 
          * Invoices.
          * 
+         * @param   {Boolean}   reset   Whether to reset the instance
          * @return  {PaymentProcessor}
          */
-        this.getPaymentProcessor = function() {
-            if (!this.paymentProcessor_) {
+        this.getPaymentProcessor = function(reset = false) {
+            if (!this.paymentProcessor_ || reset === true) {
                 this.paymentProcessor_ = new PaymentProcessor(this);
             }
 
@@ -251,10 +253,11 @@
          * The returned object is responsible for transactions co-signing
          * in case the Bot is configured in Sign-Mode.
          * 
+         * @param   {Boolean}   reset   Whether to reset the instance
          * @return  {MultisigCosignatory}
          */
-        this.getMultisigCosignatory = function() {
-            if (!this.multisigCosignatory_) {
+        this.getMultisigCosignatory = function(reset = false) {
+            if (!this.multisigCosignatory_ || reset === true) {
                 this.multisigCosignatory_ = new MultisigCosignatory(this);
             }
 
@@ -283,11 +286,28 @@
 
                 nextHost = nodesList[i].host;
                 nextPort = nodesList[i].port;
+                break;
             }
 
+            // connect to node
             this.node_ = this.nem_.model.objects.create("endpoint")(nextHost, nextPort);
             this.nemHost = nextHost;
             this.nemPort = nextPort;
+
+            // reset blockchain sockets
+            if (this.isReadBot()) {
+                this.getPaymentProcessor(true)
+                    .connectBlockchainSocket();
+            }
+
+            if (this.isSignBot()) {
+                this.getMultisigCosignatory(true)
+                    .connectBlockchainSocket();
+            }
+
+            this.getBlocksAuditor(true)
+                .connectBlockchainSocket();
+
             return this;
         };
 

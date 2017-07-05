@@ -276,11 +276,7 @@
             // first subscribe websocket for reading new incoming blocks
             self.blockchain_
                 .getBlocksAuditor()
-                .connectBlockchainSocket()
-                .registerBlockDelayAuditor(function(blockchain) {
-                    self.blockchain_ = blockchain;
-                    self.initSocketProxy();
-                });
+                .connectBlockchainSocket();
         };
 
         /**

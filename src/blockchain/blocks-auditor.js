@@ -33,7 +33,7 @@
 
         this.blockchain_ = chainDataLayer;
         this.db_ = this.blockchain_.getDatabaseAdapter();
-
+        this.nemsocket_ = null;
         this.nemConnection_ = null;
         this.nemSubscriptions_ = {};
 
@@ -100,8 +100,7 @@
                     self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'subscribing to /errors.');
                     self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
                         self.logger()
-                            .error("[NEM] [AUDIT-SOCKET] [ERROR]", __line,
-                                "Error Happened: " + message.body);
+                            .error("[NEM] [AUDIT-SOCKET] [ERROR]", __line, "Error Happened: " + message.body);
                     });
 
                     // NEM Websocket new blocks Listener
@@ -124,6 +123,7 @@
 
             }, websocketErrorHandler);
 
+            self.registerBlockDelayAuditor();
             return self;
         };
 
@@ -148,14 +148,25 @@
 
                 // fetch blocks from DB to get the latest time of fetch
                 self.db_.NEMBlockHeight.findOne({}, null, { sort: { blockHeight: -1 } }, function(err, block) {
+                    if (err) {
+                        // error happened
+                        self.logger().warn("[NEM] [AUDIT-SOCKET] [ERROR]", __line, "DB Read error for NEMBlockHeight: " + err);
+
+                        clearInterval(aliveInterval);
+                        self.connectBlockchainSocket();
+                        return false;
+                    }
+
                     // maximum age is 5 minute old
                     var limitAge = new Date().valueOf() - (5 * 60 * 1000);
-                    if (block.createdAt <= limitAge) {
+                    if (!block || block.createdAt <= limitAge) {
                         // need to switch node.
                         self.logger().warn("[NEM] [AUDIT-SOCKET]", __line, "Socket connection lost with node: " + JSON.stringify(self.blockchain_.node_.host) + ".. Now hot-switching Node.");
-                        self.blockchain_.autoSwitchNode();
+                        self.blockchain_ = self.blockchain_.autoSwitchNode();
 
-                        if (callback) return callback(self.blockchain_);
+                        // after connection was established to new node, we should fetch
+                        // the last block height to start fresh.
+                        self.websocketFallbackHandler();
                     }
 
                     return false;
@@ -163,6 +174,31 @@
             }, 10 * 60 * 1000);
 
             return self;
+        };
+
+        /**
+         * This method uses the SDK to fetch the latest block height
+         * from the NEM blockchain Node configured in `this.blockchain_`.
+         * 
+         * @return void
+         */
+        this.websocketFallbackHandler = function() {
+            var self = this;
+
+            // fetch the latest block height and save in database
+            self.blockchain_.nem()
+                .com.requests.chain.height(self.blockchain_.endpoint())
+                .then(function(res) {
+                    res = res.data;
+
+                    self.logger().info("[NEM] [AUDIT-HTTP]", __line, 'new_block(' + JSON.stringify(res) + ')');
+
+                    var block = new self.db_.NEMBlockHeight({
+                        blockHeight: res.height,
+                        createdAt: new Date().valueOf()
+                    });
+                    block.save();
+                });
         };
 
         var self = this; {

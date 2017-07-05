@@ -39,6 +39,7 @@
         this.blockchain_ = chainDataLayer;
         this.db_ = this.blockchain_.getDatabaseAdapter();
 
+        this.nemsocket_ = null;
         this.backend_ = null;
         this.channel_ = null;
         this.params_ = null;
@@ -398,9 +399,9 @@
                 .com.requests.account.transactions
                 .incoming(self.blockchain_.endpoint(), self.blockchain_.getBotReadWallet(), null, lastTrxRead)
                 .then(function(res) {
-                    //DEBUG self.logger().info("[DEBUG]", "[PACNEM CREDITS]", "Result from NIS API account.transactions.incoming: " + JSON.stringify(res));
-                    //DEBUG self.logger().info("[DEBUG]", "[PACNEM CREDITS]", "Result from NIS API account.transactions.incoming: " + res.length + " Transactions.");
-
+                    //DEBUG self.logger().info("[DEBUG]", "[PACNEM CREDITS]", "Result from NIS API account.transactions.incoming: " + JSON.stringify(res.data));
+                    //DEBUG self.logger().info("[DEBUG]", "[PACNEM CREDITS]", "Result from NIS API account.transactions.incoming: " + res.data.length + " Transactions.");
+                    res = res.data;
                     var transactions = res;
 
                     lastTrxRead = self.processIncomingTransactions(transactions);
