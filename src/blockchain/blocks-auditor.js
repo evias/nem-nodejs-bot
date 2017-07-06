@@ -17,8 +17,6 @@
 
 (function() {
 
-    var nemAPI = require("nem-api");
-
     /**
      * class BlocksAuditor implements a simple blocks reading Websocket
      * subscription.
@@ -28,13 +26,12 @@
      *
      * @author  Grégory Saive <greg@evias.be> (https://github.com/evias)
      */
-    var BlocksAuditor = function(chainDataLayer) {
-        var api_ = nemAPI;
+    var BlocksAuditor = function(auditModule) {
+        this.module_ = auditModule;
 
-        this.blockchain_ = chainDataLayer;
-        this.db_ = this.blockchain_.getDatabaseAdapter();
-        this.nemsocket_ = null;
-        this.nemConnection_ = null;
+        this.blockchain_ = this.module_.blockchain_;
+        this.db_ = this.module_.db_;
+        this.nemsocket_ = this.module_.nemsocket_;
         this.nemSubscriptions_ = {};
 
         this.logger = function() {
@@ -46,82 +43,80 @@
         };
 
         /**
-         * Configure the BlocksAuditor websocket connections. This class
-         * will connect to following websocket channels:
+         * The autoSwitchNode() method will automatically select the 
+         * next NEM endpoint Host and Port from the configuration file.
          * 
-         * - /errors
-         * - /blocks/new
-         * 
-         * Standard API Disconnection is handled in the `websocketErrorHandler`
-         * closure and will issue an automatic reconnection. This process happens
-         * approximately every 10 minutes.
+         * This method is called whenever the websocket connection can't 
+         * read blocks or hasn't read blocks in more than 5 minutes.
          * 
          * @return  {BlocksAuditor}
          */
-        this.connectBlockchainSocket = function() {
+        this.autoSwitchSocketNode = function() {
             var self = this;
+            var currentHost = self.blockchain_.node_.host;
 
-            // initialize the socket connection with the current
-            // blockchain instance connected endpoint
-            self.nemsocket_ = new api_(self.blockchain_.getNetwork().host + ":" + self.blockchain_.getNetwork().port);
+            // iterate nodes and connect to first 
+            var nodesList = self.blockchain_.conf_.nem["nodes" + self.blockchain_.confSuffix];
+            var nextHost = null;
+            var nextPort = null;
+            do {
+                var cntNodes = nodesList.length;
+                var randomIdx = Math.floor(Math.random() * (cntNodes - 1));
 
-            // define helper for websocket error handling, the NEM Blockchain Socket
-            // should be alive as long as the bot is running so we will always try
-            // to reconnect, unless the bot has been stopped from running or has crashed.
-            var websocketErrorHandler = function(error) {
-                var regexp_LostConn = new RegExp(/Lost connection to/);
-                if (regexp_LostConn.test(error)) {
-                    // connection lost, re-connect
+                nextHost = nodesList[i].host;
+                nextPort = nodesList[i].port;
+            }
+            while (nextHost == currentHost);
 
-                    self.logger()
-                        .warn("[NEM] [AUDIT-SOCKET] [DROP]", __line,
-                            "Connection lost with node: " + JSON.stringify(self.nemsocket_.socketpt) + ".. Now re-connecting.");
+            self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Socket now switching to Node: " + nextHost + ":" + nextPort + ".");
 
-                    self.connectBlockchainSocket();
-                    return true;
-                }
-                //XXX ECONNREFUSED => switch node
+            // connect to node
+            self.blockchain_.node_ = self.blockchain_.nem_.model.objects.create("endpoint")(nextHost, nextPort);
+            self.blockchain_.nemHost = nextHost;
+            self.blockchain_.nemPort = nextPort;
 
-                // uncaught error happened
-                self.logger()
-                    .error("[NEM] [AUDIT-SOCKET] [ERROR]", __line, "Uncaught Error: " + error);
-            };
+            // now reconnect sockets
+            self.module_.connectBlockchainSocket();
+            return self;
+        };
 
-            // Connect to NEM Blockchain Websocket now
-            self.nemConnection_ = self.nemsocket_.connectWS(function() {
-                // on connection we subscribe only to the /errors websocket.
-                // BlocksAuditor will open
+        /**
+         * Configure the BlocksAuditor websocket connections. This class
+         * will connect to following websocket channels:
+         * 
+         * - /blocks/new
+         * 
+         * @return  {BlocksAuditor}
+         */
+        this.subscribeToBlockUpdates = function() {
+            var self = this;
+            self.nemSubscriptions_ = {};
 
-                try {
-                    self.logger()
-                        .info("[NEM] [AUDIT-SOCKET] [CONNECT]", __line, "Connection established with node: " + JSON.stringify(self.nemsocket_.socketpt));
+            try {
+                // Listen on ALREADY CONNECTED SOCKET
+                self.logger().info("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, 'subscribing to /blocks/new.');
+                self.nemSubscriptions_["/blocks/new"] = self.nemsocket_.subscribeWS("/blocks/new", function(message) {
+                    var parsed = JSON.parse(message.body);
+                    self.logger().info("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, 'new_block(' + JSON.stringify(parsed) + ')');
 
-                    // NEM Websocket Error listening
-                    self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'subscribing to /errors.');
-                    self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
-                        self.logger()
-                            .error("[NEM] [AUDIT-SOCKET] [ERROR]", __line, "Error Happened: " + message.body);
+                    // check whether this block already exists or save
+                    var bkQuery = { moduleName: self.module_.moduleName, blockHeight: parsed.height };
+                    self.db_.NEMBlockHeight.findOne(bkQuery, function(err, block) {
+                        if (!err && !block) {
+                            block = new self.db_.NEMBlockHeight({
+                                blockHeight: parsed.height,
+                                moduleName: self.module_.moduleName,
+                                createdAt: new Date().valueOf()
+                            });
+                            block.save();
+                        }
                     });
+                });
 
-                    // NEM Websocket new blocks Listener
-                    self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'subscribing to /blocks/new.');
-                    self.nemSubscriptions_["/blocks/new"] = self.nemsocket_.subscribeWS("/blocks/new", function(message) {
-                        var parsed = JSON.parse(message.body);
-                        self.logger().info("[NEM] [AUDIT-SOCKET]", __line, 'new_block(' + JSON.stringify(parsed) + ')');
-
-                        var block = new self.db_.NEMBlockHeight({
-                            blockHeight: parsed.height,
-                            createdAt: new Date().valueOf()
-                        });
-                        block.save();
-                    });
-
-                } catch (e) {
-                    // On Exception, restart connection process
-                    self.connectBlockchainSocket();
-                }
-
-            }, websocketErrorHandler);
+            } catch (e) {
+                // On Exception, restart connection process
+                self.subscribeToBlockUpdates();
+            }
 
             self.registerBlockDelayAuditor();
             return self;
@@ -147,13 +142,13 @@
             var aliveInterval = setInterval(function() {
 
                 // fetch blocks from DB to get the latest time of fetch
-                self.db_.NEMBlockHeight.findOne({}, null, { sort: { blockHeight: -1 } }, function(err, block) {
+                self.db_.NEMBlockHeight.findOne({ moduleName: self.module_ }, null, { sort: { blockHeight: -1 } }, function(err, block) {
                     if (err) {
                         // error happened
-                        self.logger().warn("[NEM] [AUDIT-SOCKET] [ERROR]", __line, "DB Read error for NEMBlockHeight: " + err);
+                        self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT] [ERROR]", __line, "DB Read error for NEMBlockHeight: " + err);
 
                         clearInterval(aliveInterval);
-                        self.connectBlockchainSocket();
+                        self.subscribeToBlockUpdates();
                         return false;
                     }
 
@@ -161,18 +156,27 @@
                     var limitAge = new Date().valueOf() - (5 * 60 * 1000);
                     if (!block || block.createdAt <= limitAge) {
                         // need to switch node.
-                        self.logger().warn("[NEM] [AUDIT-SOCKET]", __line, "Socket connection lost with node: " + JSON.stringify(self.blockchain_.node_.host) + ".. Now hot-switching Node.");
-                        self.blockchain_ = self.blockchain_.autoSwitchNode();
+                        try {
+                            self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Socket connection lost with node: " + JSON.stringify(self.blockchain_.node_.host) + ".. Now hot-switching Node.");
 
-                        // after connection was established to new node, we should fetch
-                        // the last block height to start fresh.
-                        self.websocketFallbackHandler();
+                            // autoSwitchNode will also re-initialize the Block Auditor
+                            clearInterval(aliveInterval);
+
+                            // after connection was established to new node, we should fetch
+                            // the last block height to start fresh.
+                            self.websocketFallbackHandler();
+                            self.autoSwitchSocketNode();
+                        } catch (e) {
+                            self.logger().error("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Socket connection lost with Error: " + e);
+                        }
                     }
 
                     return false;
                 });
             }, 10 * 60 * 1000);
 
+            // first time use HTTP fallback to have latest block when starting
+            self.websocketFallbackHandler();
             return self;
         };
 
@@ -189,23 +193,31 @@
             self.blockchain_.nem()
                 .com.requests.chain.height(self.blockchain_.endpoint())
                 .then(function(res) {
-                    res = res.data;
 
-                    self.logger().info("[NEM] [AUDIT-HTTP]", __line, 'new_block(' + JSON.stringify(res) + ')');
+                    self.logger().info("[NEM] [" + self.module_.logLabel + "] [AUDIT-FALLBACK]", __line, 'new_block(' + JSON.stringify(res) + ')');
 
-                    var block = new self.db_.NEMBlockHeight({
-                        blockHeight: res.height,
-                        createdAt: new Date().valueOf()
+                    // check whether this block already exists or save
+                    var bkQuery = { moduleName: self.module_.moduleName, blockHeight: res.height };
+                    self.db_.NEMBlockHeight.findOne(bkQuery, function(err, block) {
+                        if (!err && !block) {
+                            block = new self.db_.NEMBlockHeight({
+                                blockHeight: res.height,
+                                moduleName: self.module_.moduleName,
+                                createdAt: new Date().valueOf()
+                            });
+                            block.save();
+                        }
                     });
-                    block.save();
                 });
         };
 
         var self = this; {
-            // nothing more done on instanciation
+            // when the BlocksAuditor is instantiated it should start
+            // auditing for blocks right a way.
+
+            self.subscribeToBlockUpdates();
         }
     };
-
 
     module.exports.BlocksAuditor = BlocksAuditor;
 }());

@@ -232,8 +232,6 @@
                 self.configureMultisigCosignatory();
             }
 
-            self.configureBlocksAuditor();
-
             io.sockets.on('connection', function(botSocket) {
                 logger.info("[BOT] [" + botSocket.id + "]", __line, 'nembot()');
                 backends_connected_[botSocket.id] = botSocket;

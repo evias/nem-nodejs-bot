@@ -18,6 +18,7 @@
 (function() {
 
     var nemAPI = require("nem-api");
+    var BlocksAuditor = require("./blocks-auditor.js").BlocksAuditor;
 
     /**
      * class PaymentProcessor implements a simple payment processor using the
@@ -50,6 +51,10 @@
         this.confirmedTrxes = {};
         this.unconfirmedTrxes = {};
         this.transactionPool = {};
+
+        this.auditor_ = null;
+        this.moduleName = "pay-socket";
+        this.logLabel = "PAY-SOCKET";
 
         this.options_ = {
             mandatoryMessage: true
@@ -216,6 +221,8 @@
                                 "Error Happened: " + message.body);
                     });
 
+                    self.auditor_ = new BlocksAuditor(self);
+
                     var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotReadWallet();
                     var confirmedUri = "/transactions/" + self.blockchain_.getBotReadWallet();
                     var sendUri = "/w/api/account/transfers/all";
@@ -331,7 +338,7 @@
             // ONLY IN CASE THE BLOCKS WEBSOCKET HAS NOT FILLED DATA FOR
             // 5 MINUTES ANYMORE (meaning the websocket connection is buggy).
             var fallbackInterval = setInterval(function() {
-                self.db_.NEMBlockHeight.find({}, [], { limit: 1, sort: { createdAt: -1 } }, function(err, lastBlock) {
+                self.db_.NEMBlockHeight.find({ moduleName: "pay-socket" }, [], { limit: 1, sort: { createdAt: -1 } }, function(err, lastBlock) {
                     var nowTime = new Date().valueOf();
                     if (lastBlock.createdAt < (nowTime - 5 * 60 * 1000)) {
                         // last block is 5 minutes old, use the FALLBACK!
