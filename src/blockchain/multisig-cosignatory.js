@@ -18,6 +18,7 @@
 (function() {
 
     var nemAPI = require("nem-api");
+    var BlocksAuditor = require("./blocks-auditor.js").BlocksAuditor;
 
     /**
      * class MultisigCosignatory implements an example of multi signature
@@ -47,6 +48,10 @@
         this.caughtTrxs_ = null;
         this.nemConnection_ = null;
         this.nemSubscriptions_ = {};
+
+        this.auditor_ = null;
+        this.moduleName = "sign-socket";
+        this.logLabel = "SIGN-SOCKET";
 
         this.options_ = {
             mandatoryMessage: true
@@ -213,6 +218,8 @@
                     self.nemSubscriptions_["/errors"] = self.nemsocket_.subscribeWS("/errors", function(message) {
                         self.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Error Happened: " + message.body);
                     });
+
+                    self.auditor_ = new BlocksAuditor(self);
 
                     var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotSignMultisigWallet();
                     var sendUri = "/w/api/account/transfers/all";

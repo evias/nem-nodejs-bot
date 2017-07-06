@@ -203,27 +203,6 @@
         };
 
         /**
-         * This method initializes the BlocksAuditor instance 
-         * for the running bot.
-         * 
-         * The returned object is responsible for reading Blocks
-         * of the Blockchain and maintaining a Timed History of 
-         * latest read data. This allows the current bot to identify
-         * broken Websockets channel subscription and re-initiate
-         * subscriptions on different nodes.
-         * 
-         * @param   {Boolean}   reset   Whether to reset the instance
-         * @return  {BlocksAuditor}
-         */
-        this.getBlocksAuditor = function(reset = false) {
-            if (!this.blocksAuditor_ || reset === true) {
-                this.blocksAuditor_ = new BlocksAuditor(this);
-            }
-
-            return this.blocksAuditor_;
-        };
-
-        /**
          * This method initializes the PaymentProcessor instance 
          * for the running bot. 
          * 
@@ -262,53 +241,6 @@
             }
 
             return this.multisigCosignatory_;
-        };
-
-        /**
-         * The autoSwitchNode() method will automatically select the 
-         * next NEM endpoint Host and Port from the configuration file.
-         * 
-         * This method is called whenever the websocket connection can't 
-         * read blocks or hasn't read blocks in more than 5 minutes.
-         * 
-         * @return  {service}
-         */
-        this.autoSwitchNode = function() {
-
-            var currentHost = this.node_.host;
-
-            // iterate nodes and connect to first 
-            var nodesList = this.conf_.nem["nodes" + this.confSuffix];
-            for (var i = 0; i < nodesList.length; i++) {
-                var host = nodesList[i].host;
-                if (host == currentHost)
-                    continue;
-
-                nextHost = nodesList[i].host;
-                nextPort = nodesList[i].port;
-                break;
-            }
-
-            // connect to node
-            this.node_ = this.nem_.model.objects.create("endpoint")(nextHost, nextPort);
-            this.nemHost = nextHost;
-            this.nemPort = nextPort;
-
-            // reset blockchain sockets
-            if (this.isReadBot()) {
-                this.getPaymentProcessor(true)
-                    .connectBlockchainSocket();
-            }
-
-            if (this.isSignBot()) {
-                this.getMultisigCosignatory(true)
-                    .connectBlockchainSocket();
-            }
-
-            this.getBlocksAuditor(true)
-                .connectBlockchainSocket();
-
-            return this;
         };
 
         /**
