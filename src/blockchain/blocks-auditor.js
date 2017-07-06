@@ -27,6 +27,12 @@
      * @author  Grégory Saive <greg@evias.be> (https://github.com/evias)
      */
     var BlocksAuditor = function(auditModule) {
+
+        if (!auditModule || typeof auditModule.connectBlockchainSocket == 'undefined') {
+            throw "Invalid module provided to BlocksAuditor class, " +
+                "missing implementation for connectBlockchainSocket method.";
+        }
+
         this.module_ = auditModule;
 
         this.blockchain_ = this.module_.blockchain_;
@@ -142,7 +148,7 @@
             var aliveInterval = setInterval(function() {
 
                 // fetch blocks from DB to get the latest time of fetch
-                self.db_.NEMBlockHeight.findOne({ moduleName: self.module_ }, null, { sort: { blockHeight: -1 } }, function(err, block) {
+                self.db_.NEMBlockHeight.findOne({ moduleName: self.module_.moduleName }, null, { sort: { blockHeight: -1 } }, function(err, block) {
                     if (err) {
                         // error happened
                         self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT] [ERROR]", __line, "DB Read error for NEMBlockHeight: " + err);
