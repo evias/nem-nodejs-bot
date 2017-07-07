@@ -160,7 +160,28 @@ and also to disable the default login credentials, like so:
 Usage Examples
 --------------
 
-### Example 1: Payment Processor NEMBot
+### Example 1: Automatic MultiSignature Account Co-Signatory NEMBot
+
+The NEMBot can also be used as a Multisignature Co-Signatory for your Multisignature Account. When you install the NEMBot and enable the `sign` Mode, you  will also need 
+to configure the `bot.sign.cosignatory.acceptFrom`, the `bot.sign.cosignatory.walletAddress` (optional) and the `bot.sign.cosignatory.privateKey` options in the `config/bot.json` file. Once you have done this, you can startt the NEMBot
+(or leave it unstarted and start it only every time you want it to co-sign something).
+
+The NEMBot will connect to the NEM Blockchain Node Websockets and listen for unconfirmed 
+transactions that it will process automatically and Co-Sign with the configured 
+`cosignatory.privateKey`. 
+
+Currently only the `cosignatory.acceptFrom` limitation is used but I plan to integrate 
+several other Transaction Co-Signing Validation features such as:
+
+* Maximum Daily Amount for Automatic Co-Signing
+* Transaction Data Auditing features implement in SigningRules
+
+This bot can be very handy when you have more than one Co-Signer and don't want to do the
+signing manually from the NanoWallet. Instead you could execute `node run_bot.js` whenever
+you need the Bot to co-sign a transaction - or even better, leave the Bot running and have
+it proceed transactions automatically, restricting the Transaction Initiator to `bot.sign.cosignatory.acceptFrom` public key.
+
+### Example 2: Payment Processor NEMBot (Invoice Payment Processing)
 
 This example implements following Flow:
 
@@ -274,11 +295,6 @@ var startPaymentChannel = function(clientSocketId, callback)
     });
 </script>
 ```
-
-### Example 2: MultiSig Co-Signatory NEMBot
-
-Example to come soon, features implemented in src/blockchain/multisig-cosignatory.js
-
 
 Pot de vin
 ----------
