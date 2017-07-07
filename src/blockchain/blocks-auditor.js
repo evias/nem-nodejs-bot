@@ -69,8 +69,8 @@
                 var cntNodes = nodesList.length;
                 var randomIdx = Math.floor(Math.random() * (cntNodes - 1));
 
-                nextHost = nodesList[i].host;
-                nextPort = nodesList[i].port;
+                nextHost = nodesList[randomIdx].host;
+                nextPort = nodesList[randomIdx].port;
             }
             while (nextHost == currentHost);
 
