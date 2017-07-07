@@ -260,7 +260,7 @@
          * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
          * @return {string}
          */
-        this.getTransactionHash = function(transactionMetaDataPair, inner = false) {
+        this.getTransactionHash = function(transactionMetaDataPair, inner = true) {
             var meta = transactionMetaDataPair.meta;
             var content = transactionMetaDataPair.transaction;
 

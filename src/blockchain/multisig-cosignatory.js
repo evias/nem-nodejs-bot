@@ -232,7 +232,6 @@
 
                         var transactionData = JSON.parse(message.body);
                         var transaction = transactionData.transaction;
-                        var trxHash = self.blockchain_.getTransactionHash(transactionData);
 
                         //XXX implement real verification of transaction type. In case it is a multisig
                         //    it should always check the transaction.otherTrans.type value.
