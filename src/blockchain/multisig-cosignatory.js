@@ -171,7 +171,9 @@
 
                         automaticTransactionSigningHandler(instance, transaction);
                     }
-                }, function(err) { instance.logger().error("[NEM] [ERROR] [SIGN-FALLBACK]", __line, "NIS API incomingTransactions Error: " + err); });
+                }, function(err) {
+                    instance.logger().error("[NEM] [ERROR] [SIGN-FALLBACK]", __line, "NIS API account.transactions.unconfirmed Error: " + err);
+                });
         };
 
         /**
@@ -320,7 +322,7 @@
             // will only sign transaction for the configured multisignature address.
                 return false;
 
-            self.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
+            //DEBUG self.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
 
             // check transaction signature with initiator public key
 
@@ -414,21 +416,20 @@
             self.blockchain_.nem().com.requests
                 .transaction.announce(self.blockchain_.endpoint(), broadcastable)
                 .then(function(res) {
-                        //DEBUG self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'Transaction Annouce Response: "' + JSON.stringify(res));
+                    //DEBUG self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'Transaction Annouce Response: "' + JSON.stringify(res));
 
-                        if (res.code >= 2) {
-                            self.blockchain_.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Error announcing transaction: " + res.message);
-                        } else if ("SUCCESS" == res.message) {
-                            // transaction broadcast successfully.
+                    if (res.code >= 2) {
+                        self.blockchain_.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Error announcing transaction: " + res.message);
+                    } else if ("SUCCESS" == res.message) {
+                        // transaction broadcast successfully.
 
-                            self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'Transaction co-signed and broadcast: "' + trxHash + '" with response: "' + res.message + '".');
-                            callback(res);
-                        }
-                        // "NEUTRAL" will not trigger callback
-                    },
-                    function(err) {
-                        self.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Signing error: " + err);
-                    });
+                        self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'Transaction co-signed and broadcast: "' + trxHash + '" with response: "' + res.message + '".');
+                        callback(res);
+                    }
+                    // "NEUTRAL" will not trigger callback
+                }, function(err) {
+                    self.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Signing error: " + err);
+                });
         };
 
         var self = this; {

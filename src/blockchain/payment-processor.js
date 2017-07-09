@@ -429,7 +429,9 @@
                         self.logger().info("[NEM] [PAY-FALLBACK] ", __line, "read a total of " + Object.getOwnPropertyNames(self.transactionPool).length + " transactions from " + self.blockchain_.getBotReadWallet() + ".");
                         callback(self);
                     }
-                }, function(err) { self.logger().error("[NEM] [ERROR] [PAY-FALLBACK]", __line, "NIS API incomingTransactions Error: " + err); });
+                }, function(err) {
+                    self.logger().error("[NEM] [ERROR] [PAY-FALLBACK]", __line, "NIS API account.transactions.incoming Error: " + err);
+                });
         };
 
         /**
