@@ -114,7 +114,11 @@
                                 moduleName: self.module_.moduleName,
                                 createdAt: new Date().valueOf()
                             });
-                            block.save();
+                            block.save(function(err) {
+                                if (err) {
+                                    self.logger().error("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Error saving NEMBlockHeight object: " + err);
+                                }
+                            });
                         }
                     });
                 });
@@ -202,7 +206,7 @@
 
                     self.logger().info("[NEM] [" + self.module_.logLabel + "] [AUDIT-FALLBACK]", __line, 'new_block(' + JSON.stringify(res) + ')');
 
-                    // check whether this block already exists or save
+                    // check whether this block already exists or create
                     var bkQuery = { moduleName: self.module_.moduleName, blockHeight: res.height };
                     self.db_.NEMBlockHeight.findOne(bkQuery, function(err, block) {
                         if (!err && !block) {
@@ -211,9 +215,15 @@
                                 moduleName: self.module_.moduleName,
                                 createdAt: new Date().valueOf()
                             });
-                            block.save();
+                            block.save(function(err) {
+                                if (err) {
+                                    self.logger().error("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Error saving NEMBlockHeight object: " + err);
+                                }
+                            });
                         }
                     });
+                }, function(err) {
+                    self.logger().error("[NEM] [" + self.module_.logLabel + "] [AUDIT-FALLBACK]", __line, "NIS API chain.height Error: " + err);
                 });
         };
 
