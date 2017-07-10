@@ -307,7 +307,7 @@
          * @return void
          */
         this.disconnectBlockchainSocket = function() {
-            if (!self.nemsocket_) return false;
+            if (!this.nemsocket_) return false;
 
             var self = this;
             for (path in self.nemSubscriptions_) {
