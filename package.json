@@ -28,7 +28,7 @@
         "mongoose-increment": "~0.6.1",
 
         "nem-sdk": "https://github.com/evias/NEM-sdk.git",
-        "nem-api": "~1.4.5"
+        "nem-api": "https://github.com/evias/nem-api.git"
     },
     "scripts": {
         "start": "node run_bot.js"

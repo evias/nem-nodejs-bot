@@ -301,6 +301,26 @@
         };
 
         /**
+         * This method will unsubscribe from websocket channels and
+         * disconnect the websocket.
+         * 
+         * @return void
+         */
+        this.disconnectBlockchainSocket = function() {
+            if (!self.nemsocket_) return false;
+
+            var self = this;
+            for (path in self.nemSubscriptions_) {
+                var subId = self.nemSubscriptions_[path];
+                self.nemsocket_.unsubscribeWS(subId);
+            }
+
+            self.nemsocket_.disconnectWS(function() {
+                self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
+            });
+        };
+
+        /**
          * This method adds a new backend Socket to the current available Socket.IO
          * client instances. This is used to forward payment status updates event
          * back to the Backend which will then forward it to the Frontend Application

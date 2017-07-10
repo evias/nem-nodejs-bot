@@ -82,6 +82,7 @@
             self.blockchain_.nemPort = nextPort;
 
             // now reconnect sockets
+            self.module_.disconnectBlockchainSocket();
             self.module_.connectBlockchainSocket();
             return self;
         };
@@ -223,7 +224,7 @@
                         }
                     });
                 }, function(err) {
-                    self.logger().error("[NEM] [" + self.module_.logLabel + "] [AUDIT-FALLBACK]", __line, "NIS API chain.height Error: " + err);
+                    self.logger().error("[NEM] [" + self.module_.logLabel + "] [AUDIT-FALLBACK]", __line, "NIS API chain.height Error: " + JSON.stringify(err));
                 });
         };
 
