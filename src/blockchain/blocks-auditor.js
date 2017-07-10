@@ -33,6 +33,11 @@
                 "missing implementation for connectBlockchainSocket method.";
         }
 
+        if (typeof auditModule.disconnectBlockchainSocket == 'undefined') {
+            throw "Invalid module provided to BlocksAuditor class, " +
+                "missing implementation for disconnectBlockchainSocket method.";
+        }
+
         this.module_ = auditModule;
 
         this.blockchain_ = this.module_.blockchain_;

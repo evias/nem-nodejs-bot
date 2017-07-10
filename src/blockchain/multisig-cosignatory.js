@@ -272,6 +272,8 @@
             for (path in self.nemSubscriptions_) {
                 var subId = self.nemSubscriptions_[path];
                 self.nemsocket_.unsubscribeWS(subId);
+
+                delete self.nemSubscriptions_[path];
             }
 
             self.nemsocket_.disconnectWS(function() {
