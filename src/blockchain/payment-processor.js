@@ -306,7 +306,7 @@
          * 
          * @return void
          */
-        this.disconnectBlockchainSocket = function() {
+        this.disconnectBlockchainSocket = function(callback) {
             if (!this.nemsocket_) return false;
 
             var self = this;
