@@ -87,8 +87,10 @@
             self.blockchain_.nemPort = nextPort;
 
             // now reconnect sockets
-            self.module_.disconnectBlockchainSocket();
-            self.module_.connectBlockchainSocket();
+            self.module_.disconnectBlockchainSocket(function() {
+                self.module_.connectBlockchainSocket();
+            });
+
             return self;
         };
 

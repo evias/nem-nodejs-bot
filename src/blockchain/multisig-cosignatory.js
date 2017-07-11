@@ -223,10 +223,8 @@
 
                     self.auditor_ = new BlocksAuditor(self);
 
-                    var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotSignMultisigWallet();
-                    var sendUri = "/w/api/account/transfers/all";
-
                     // NEM Websocket unconfirmed transactions Listener
+                    var unconfirmedUri = "/unconfirmed/" + self.blockchain_.getBotSignMultisigWallet();
                     self.logger().info("[NEM] [SIGN-SOCKET]", __line, 'subscribing to ' + unconfirmedUri + '.');
                     self.nemSubscriptions_[unconfirmedUri] = self.nemsocket_.subscribeWS(unconfirmedUri, function(message) {
                         var parsed = JSON.parse(message.body);
@@ -247,6 +245,7 @@
                         automaticTransactionSigningHandler(self, transactionData);
                     });
 
+                    var sendUri = "/w/api/account/transfers/all";
                     self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotSignWallet() }));
 
                 } catch (e) {
@@ -265,7 +264,7 @@
          * 
          * @return void
          */
-        this.disconnectBlockchainSocket = function() {
+        this.disconnectBlockchainSocket = function(callback) {
             if (!this.nemsocket_) return false;
 
             var self = this;
@@ -278,6 +277,9 @@
 
             self.nemsocket_.disconnectWS(function() {
                 self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
+
+                if (callback)
+                    return callback();
             });
         };
 

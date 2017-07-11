@@ -319,6 +319,9 @@
 
             self.nemsocket_.disconnectWS(function() {
                 self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
+
+                if (callback)
+                    return callback();
             });
         };
 
