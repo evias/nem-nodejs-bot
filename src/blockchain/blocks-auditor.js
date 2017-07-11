@@ -64,30 +64,30 @@
          */
         this.autoSwitchSocketNode = function() {
             var self = this;
-            var currentHost = self.blockchain_.node_.host;
-
-            // iterate nodes and connect to first 
-            var nodesList = self.blockchain_.conf_.nem["nodes" + self.blockchain_.confSuffix];
-            var nextHost = null;
-            var nextPort = null;
-            do {
-                var cntNodes = nodesList.length;
-                var randomIdx = Math.floor(Math.random() * (cntNodes - 1));
-
-                nextHost = nodesList[randomIdx].host;
-                nextPort = nodesList[randomIdx].port;
-            }
-            while (nextHost == currentHost);
-
-            self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Socket now switching to Node: " + nextHost + ":" + nextPort + ".");
-
-            // connect to node
-            self.blockchain_.node_ = self.blockchain_.nem_.model.objects.create("endpoint")(nextHost, nextPort);
-            self.blockchain_.nemHost = nextHost;
-            self.blockchain_.nemPort = nextPort;
-
-            // now reconnect sockets
+            // unsubscribe & disconnect, then re-issue connection
             self.module_.disconnectBlockchainSocket(function() {
+                var currentHost = self.blockchain_.node_.host;
+
+                // iterate nodes and connect to first 
+                var nodesList = self.blockchain_.conf_.nem["nodes" + self.blockchain_.confSuffix];
+                var nextHost = null;
+                var nextPort = null;
+                do {
+                    var cntNodes = nodesList.length;
+                    var randomIdx = Math.floor(Math.random() * (cntNodes - 1));
+
+                    nextHost = nodesList[randomIdx].host;
+                    nextPort = nodesList[randomIdx].port;
+                }
+                while (nextHost == currentHost);
+
+                self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Socket now switching to Node: " + nextHost + ":" + nextPort + ".");
+
+                // connect to node
+                self.blockchain_.node_ = self.blockchain_.nem_.model.objects.create("endpoint")(nextHost, nextPort);
+                self.blockchain_.nemHost = nextHost;
+                self.blockchain_.nemPort = nextPort;
+
                 self.module_.connectBlockchainSocket();
             });
 
