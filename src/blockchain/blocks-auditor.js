@@ -81,12 +81,13 @@
                 }
                 while (nextHost == currentHost);
 
-                self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Socket now switching to Node: " + nextHost + ":" + nextPort + ".");
+                self.logger().info("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Socket now switching to Node: " + nextHost + ":" + nextPort + ".");
 
                 // connect to node
                 self.blockchain_.node_ = self.blockchain_.nem_.model.objects.create("endpoint")(nextHost, nextPort);
                 self.blockchain_.nemHost = nextHost;
                 self.blockchain_.nemPort = nextPort;
+                self.module_.blockchain_ = self.blockchain_;
 
                 self.module_.connectBlockchainSocket();
             });
@@ -183,7 +184,15 @@
                             // after connection was established to new node, we should fetch
                             // the last block height to start fresh.
                             self.websocketFallbackHandler();
-                            self.autoSwitchSocketNode();
+
+                            // wait 10 seconds for websocketFallbackHandler to have received
+                            // all data about the latest block using the HTTP API. 
+                            self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Now waiting 10 seconds before next connection attempt.");
+
+                            setTimeout(function() {
+                                // disconnect and re-connect
+                                self.autoSwitchSocketNode();
+                            }, 10000);
                         } catch (e) {
                             self.logger().error("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Socket connection lost with Error: " + e);
                         }
