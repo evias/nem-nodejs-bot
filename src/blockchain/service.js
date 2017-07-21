@@ -340,18 +340,18 @@
 
             // multsigs contain the 
             var multisigType = this.nem().model.transactionTypes.multisigTransaction;
-            var transactionType = transaction.type;
+            var transactionType = content.type;
 
-            var signer = transaction.signer;
+            var signer = content.signer;
             if (transactionType === multisigType) {
-                signer = transaction.otherTrans.signer;
+                signer = content.otherTrans.signer;
             }
 
-            var sender = this.getAddressFromPubKey(signer);
+            var sender = this.getAddressFromPublicKey(signer);
             return sender;
         };
 
-        this.getAddressFromPubKey = function(pubKey) {
+        this.getAddressFromPublicKey = function(pubKey) {
             var network = this.getNetwork().config.id;
             var address = this.nem().model.address.toAddress(pubKey, network);
 
