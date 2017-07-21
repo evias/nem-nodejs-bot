@@ -234,7 +234,6 @@
                         self.logger().info("[NEM] [PAY-SOCKET]", __line, 'unconfirmed(' + JSON.stringify(parsed) + ')');
 
                         var transactionData = JSON.parse(message.body);
-                        var transaction = transactionData.transaction;
                         var trxHash = self.blockchain_.getTransactionHash(transactionData);
 
                         self.db_.NEMTransactionPool.findOne({ transactionHash: trxHash }, function(err, entry) {
@@ -264,7 +263,6 @@
                         self.logger().info("[NEM] [PAY-SOCKET]", __line, 'transactions(' + JSON.stringify(parsed) + ')');
 
                         var transactionData = JSON.parse(message.body);
-                        var transaction = transactionData.transaction;
                         var trxHash = self.blockchain_.getTransactionHash(transactionData);
 
                         // this time also include "status" filtering.
@@ -317,12 +315,21 @@
                 delete self.nemSubscriptions_[path];
             }
 
-            self.nemsocket_.disconnectWS(function() {
-                self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
+            try {
+                self.nemsocket_.disconnectWS(function() {
+                    self.logger().info("[NEM] [PAY-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
+
+                    if (callback)
+                        return callback();
+                });
+            } catch (e) {
+                // stompjs transmit() sometimes won't end before the
+                // socket connection object (inside stomp-node) is deleted.
+                self.logger().warn("[NEM] [PAY-SOCKET] [DISCONNECT]", __line, "Disconnection forced.");
 
                 if (callback)
                     return callback();
-            });
+            }
         };
 
         /**

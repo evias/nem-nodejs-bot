@@ -185,14 +185,14 @@
                             // the last block height to start fresh.
                             self.websocketFallbackHandler();
 
-                            // wait 10 seconds for websocketFallbackHandler to have received
+                            // wait 3 seconds for websocketFallbackHandler to have received
                             // all data about the latest block using the HTTP API. 
-                            self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Now waiting 10 seconds before next connection attempt.");
+                            self.logger().warn("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Now waiting 3 seconds before next connection attempt.");
 
                             setTimeout(function() {
                                 // disconnect and re-connect
                                 self.autoSwitchSocketNode();
-                            }, 10000);
+                            }, 3000);
                         } catch (e) {
                             self.logger().error("[NEM] [" + self.module_.logLabel + "] [AUDIT]", __line, "Socket connection lost with Error: " + e);
                         }
