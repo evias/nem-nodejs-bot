@@ -178,13 +178,8 @@
                 }
 
                 var recipient = transaction.recipient;
-                var signer = transaction.signer;
-                var network = chainDataLayer.getNetwork().config.id;
-                var sender = chainDataLayer.nem().model.address.toAddress(signer, network);
-
-                var trxHash = meta.hash.data;
-                if (meta.innerHash.data && meta.innerHash.data.length)
-                    trxHash = meta.innerHash.data;
+                var sender = chainDataLayer.getTransactionSender(transactionMetaDataPair);
+                var trxHash = chainDataLayer.getTransactionHash(transactionMetaDataPair);
 
                 // first try to load the channel by transaction hash
                 var model = mongoose.model("NEMPaymentChannel");
@@ -193,8 +188,7 @@
                     // try to load the channel by transaction message
 
                     // message available, build it from payload and try loading a channel.
-                    var payload = transaction.message.payload;
-                    var plain = chainDataLayer.nem().utils.convert.hex2a(payload);
+                    var plain = chainDataLayer.getTransactionMessage(transactionMetaDataPair);
 
                     // DEBUG dbLog("[NEM] [DEBUG]", __line, "Found transaction with message '" + plain + "': " + trxHash);
 

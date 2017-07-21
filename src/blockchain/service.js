@@ -301,7 +301,7 @@
                         continue;
 
                     // XEM divisibility is 10^6
-                    return (multiplier * mosaic.quantity).toFixed(divisibility);
+                    return multiplier * mosaic.quantity;
                 }
 
                 // no XEM in transaction.
@@ -319,13 +319,74 @@
          * Read the Transaction XEM Fee amount.
          *
          * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
-         * @return {[type]}                         [description]
+         * @return {Integer}
          */
         this.getTransactionFee = function(transactionMetaDataPair) {
             var meta = transactionMetaDataPair.meta;
             var content = transactionMetaDataPair.transaction;
 
             return content.fee;
+        };
+
+        /**
+         * Read the Transaction SENDER XEM Address.
+         *
+         * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
+         * @return {String}
+         */
+        this.getTransactionSender = function(transactionMetaDataPair) {
+            var meta = transactionMetaDataPair.meta;
+            var content = transactionMetaDataPair.transaction;
+
+            // multsigs contain the 
+            var multisigType = this.nem().model.transactionTypes.multisigTransaction;
+            var transactionType = transaction.type;
+
+            var signer = transaction.signer;
+            if (transactionType === multisigType) {
+                signer = transaction.otherTrans.signer;
+            }
+
+            var sender = this.getAddressFromPubKey(signer);
+            return sender;
+        };
+
+        this.getAddressFromPubKey = function(pubKey) {
+            var network = this.getNetwork().config.id;
+            var address = this.nem().model.address.toAddress(pubKey, network);
+
+            return address;
+        };
+
+        /**
+         * Read blockchain transaction Message from TransactionMetaDataPair
+         *
+         * @param  [TransactionMetaDataPair]{@link http://bob.nem.ninja/docs/#transactionMetaDataPair} transactionMetaDataPair
+         * @return {string}
+         */
+        this.getTransactionMessage = function(transactionMetaDataPair) {
+            var meta = transactionMetaDataPair.meta;
+            var content = transactionMetaDataPair.transaction;
+
+            var trxRealData = content;
+            if (content.type == this.nem().model.transactionTypes.multisigTransaction) {
+                // multisig, message will be in otherTrans
+                trxRealData = content.otherTrans;
+            }
+
+            if (!trxRealData.message || !trxRealData.message.payload)
+            // no message found in transaction
+                return "";
+
+            //DEBUG logger_.info("[DEBUG]", "[BLOCKCHAIN]", "Reading following message: " + JSON.stringify(trxRealData.message));
+
+            // decode transaction message and job done
+            var payload = trxRealData.message.payload;
+            var plain = this.nem().utils.convert.hex2a(payload);
+
+            //DEBUG logger_.info("[DEBUG]", "[BLOCKCHAIN]", "Message Read: " + JSON.stringify(plain));
+
+            return plain;
         };
 
         var self = this; {

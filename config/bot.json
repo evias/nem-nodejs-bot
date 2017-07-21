@@ -5,7 +5,7 @@
         "read": {
             "walletAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
             "duration": 300000,
-            "useTransactionMessageAlways": true
+            "useTransactionMessageAlways": false
         },
         "sign": {
             "multisigAddress": "TCTIMURL5LPKNJYF3OB3ACQVAXO3GK5IU2BJMPSU",
@@ -35,16 +35,16 @@
         "isTestMode": true,
         "isMijin": false,
         "nodes": [
-            {"host": "http://alice6.nem.ninja", "port": 7890},
-            {"host": "http://alice7.nem.ninja", "port": 7890},
-            {"host": "http://san.nem.ninja", "port": 7890}
+            { "host": "http://alice6.nem.ninja", "port": 7890 },
+            { "host": "http://alice7.nem.ninja", "port": 7890 },
+            { "host": "http://san.nem.ninja", "port": 7890 }
         ],
         "nodes_test": [
-            {"host": "http://bigalice2.nem.ninja", "port": 7890},
-            {"host": "http://bob.nem.ninja", "port": 7890},
-            {"host": "http://104.128.226.60", "port": 7890},
-            {"host": "http://23.22.67.85", "port": 7890}
-
+            { "host": "http://50.3.87.123", "port": 7890 },
+            { "host": "http://bigalice2.nem.ninja", "port": 7890 },
+            { "host": "http://bob.nem.ninja", "port": 7890 },
+            { "host": "http://104.128.226.60", "port": 7890 },
+            { "host": "http://23.22.67.85", "port": 7890 }
         ]
     }
 }

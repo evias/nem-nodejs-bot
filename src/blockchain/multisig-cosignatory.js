@@ -332,19 +332,21 @@
             var trxSignature = content.signature.toString();
             var trxInitiatorPubKey = content.signer;
 
+            if (!isMultisig)
+                return 1;
+
             // in case we have a multisig, the transaction.otherTrans.signer is the Multisig
             // Account public key. This lets us verify the authenticity of the Transaction some more.
-            var trxAcctPubKey = trxRealData.signer;
-            var trxRealAccount = self.blockchain_.nem_.model.address.toAddress(trxAcctPubKey, self.blockchain_.getNetwork().config.id).replace(/-/g, '');
+            var trxRealAccount = self.blockchain_.getAddressFromPublicKey(trxRealData.signer);
             var multisigAccount = self.config().bot.sign.multisigAddress;
-
-            if (!self.isAcceptedCosignatory(trxInitiatorPubKey))
-            // bot.sign.cosignatory.acceptFrom
-                return false;
 
             if (trxRealAccount != multisigAccount)
             // will only sign transaction for the configured multisignature address.
-                return false;
+                return 2;
+
+            if (!self.isAcceptedCosignatory(trxInitiatorPubKey))
+            // bot.sign.cosignatory.acceptFrom
+                return 3;
 
             //DEBUG self.logger().info("[NEM] [DEBUG] ", __line, 'Now verifying transaction "' + trxHash + '" with signature "' + trxSignature + '" and initiator "' + trxInitiatorPubKey + '"');
 
@@ -411,11 +413,12 @@
 
             // (2) verify transaction validity on the blockchain
 
-            if (!self.verifyTransaction(transactionMetaDataPair)) {
-                throw "Invalid transactionMetaDataPair object provided. Signature could not be verified!";
-            }
+            $result = self.verifyTransaction(transactionMetaDataPair);
 
-            //XXX only sign transactions if they correspond to this NEMBot's co-signing conditions (other than max daily amount..)
+            if (true !== $result) {
+                // not signing this transaction.
+                return false;
+            }
 
             // (3) transaction is genuine and was not tampered with, we can now sign it too.
 
