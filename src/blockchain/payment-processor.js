@@ -286,7 +286,7 @@
                         });
                     });
 
-                    self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotReadWallet() }));
+                    //self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotReadWallet() }));
 
                 } catch (e) {
                     // On Exception, restart connection process
@@ -308,14 +308,14 @@
             if (!this.nemsocket_) return false;
 
             var self = this;
-            for (path in self.nemSubscriptions_) {
-                var subId = self.nemSubscriptions_[path];
-                self.nemsocket_.unsubscribeWS(subId);
-
-                delete self.nemSubscriptions_[path];
-            }
-
             try {
+                for (path in self.nemSubscriptions_) {
+                    var subId = self.nemSubscriptions_[path];
+                    self.nemsocket_.unsubscribeWS(subId);
+
+                    delete self.nemSubscriptions_[path];
+                }
+
                 self.nemsocket_.disconnectWS(function() {
                     self.logger().info("[NEM] [PAY-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
 
@@ -323,12 +323,11 @@
                         return callback();
                 });
             } catch (e) {
-                // stompjs transmit() sometimes won't end before the
-                // socket connection object (inside stomp-node) is deleted.
-                self.logger().warn("[NEM] [PAY-SOCKET] [DISCONNECT]", __line, "Disconnection forced.");
+                // hot disconnect
+                self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket Hot Disconnect.");
 
-                if (callback)
-                    return callback();
+                delete self.nemsocket_;
+                return callback();
             }
         };
 
