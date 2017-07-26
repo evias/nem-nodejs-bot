@@ -37,14 +37,30 @@
         "nodes": [
             { "host": "http://alice6.nem.ninja", "port": 7890 },
             { "host": "http://alice7.nem.ninja", "port": 7890 },
-            { "host": "http://san.nem.ninja", "port": 7890 }
+            { "host": "http://san.nem.ninja", "port": 7890 },
+            { "host": "http://62.75.171.41", "port": 7890 },
+            { "host": "http://185.53.131.101", "port": 7890 },
+            { "host": "http://104.251.212.131", "port": 7890 },
+            { "host": "http://202.5.19.142", "port": 7890 },
+            { "host": "http://167.114.182.195", "port": 7890 },
+            { "host": "http://139.196.203.180", "port": 7890 },
+            { "host": "http://hugealice.nem.ninja", "port": 7890 },
+            { "host": "http://209.126.98.204", "port": 7890 },
+            { "host": "http://133.130.103.44", "port": 7890 },
+            { "host": "http://45.32.42.134", "port": 7890 },
+            { "host": "http://185.141.165.153", "port": 7890 },
+            { "host": "http://123.56.253.121", "port": 7890 }
         ],
         "nodes_test": [
             { "host": "http://50.3.87.123", "port": 7890 },
             { "host": "http://bigalice2.nem.ninja", "port": 7890 },
-            { "host": "http://bob.nem.ninja", "port": 7890 },
             { "host": "http://104.128.226.60", "port": 7890 },
-            { "host": "http://23.22.67.85", "port": 7890 }
+            { "host": "http://150.95.145.157", "port": 7890 },
+            { "host": "http://188.68.50.161", "port": 7890 },
+            { "host": "http://37.120.188.83", "port": 7890 },
+            { "host": "http://23.22.67.85", "port": 7890 },
+            { "host": "http://23.228.67.85", "port": 7890 },
+            { "host": "http://45.77.47.227", "port": 7890 }
         ]
     }
 }
