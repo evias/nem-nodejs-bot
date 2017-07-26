@@ -246,7 +246,7 @@
                     });
 
                     var sendUri = "/w/api/account/transfers/all";
-                    self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotSignWallet() }));
+                    //self.nemsocket_.sendWS(sendUri, {}, JSON.stringify({ account: self.blockchain_.getBotSignWallet() }));
 
                 } catch (e) {
                     // On Exception, restart connection process
@@ -268,19 +268,27 @@
             if (!this.nemsocket_) return false;
 
             var self = this;
-            for (path in self.nemSubscriptions_) {
-                var subId = self.nemSubscriptions_[path];
-                self.nemsocket_.unsubscribeWS(subId);
+            try {
+                for (path in self.nemSubscriptions_) {
+                    var subId = self.nemSubscriptions_[path];
+                    self.nemsocket_.unsubscribeWS(subId);
 
-                delete self.nemSubscriptions_[path];
+                    delete self.nemSubscriptions_[path];
+                }
+
+                self.nemsocket_.disconnectWS(function() {
+                    self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
+
+                    if (callback)
+                        return callback();
+                });
+            } catch (e) {
+                // hot disconnect
+                self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket Hot Disconnect.");
+
+                delete self.nemsocket_;
+                return callback();
             }
-
-            self.nemsocket_.disconnectWS(function() {
-                self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
-
-                if (callback)
-                    return callback();
-            });
         };
 
         /**
