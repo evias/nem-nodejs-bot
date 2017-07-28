@@ -19,6 +19,7 @@
 
     var nemAPI = require("nem-api");
     var BlocksAuditor = require("./blocks-auditor.js").BlocksAuditor;
+    var SocketErrorHandler = require("./socket-error-handler.js").SocketErrorHandler;
 
     /**
      * class PaymentProcessor implements a simple payment processor using the
@@ -53,6 +54,7 @@
         this.transactionPool = {};
 
         this.auditor_ = null;
+        this.errorHandler_ = null;
         this.moduleName = "pay-socket";
         this.logLabel = "PAY-SOCKET";
 
@@ -66,6 +68,14 @@
 
         this.config = function() {
             return this.blockchain_.conf_;
+        };
+
+        this.getAuditor = function() {
+            return this.auditor_;
+        };
+
+        this.getErrorHandler = function() {
+            return this.errorHandler_;
         };
 
         // define helper for handling incoming transactions. This helper is called from a callback
@@ -183,26 +193,7 @@
             // blockchain instance connected endpoint
             self.nemsocket_ = new api_(self.blockchain_.getNetwork().host + ":" + self.blockchain_.getNetwork().port);
 
-            // define helper for websocket error handling, the NEM Blockchain Socket
-            // should be alive as long as the bot is running so we will always try
-            // to reconnect, unless the bot has been stopped from running or has crashed.
-            var websocketErrorHandler = function(error) {
-                var regexp_LostConn = new RegExp(/Lost connection to/);
-                if (regexp_LostConn.test(error)) {
-                    // connection lost, re-connect
-
-                    self.logger()
-                        .warn("[NEM] [PAY-SOCKET] [DROP]", __line, "Connection lost with node: " + JSON.stringify(self.nemsocket_.socketpt) + ".. Now re-connecting.");
-
-                    self.connectBlockchainSocket();
-                    return true;
-                }
-                //XXX ECONNREFUSED => switch node
-
-                // uncaught error happened
-                self.logger()
-                    .error("[NEM] [PAY-SOCKET] [ERROR]", __line, "Uncaught Error: " + error);
-            };
+            self.errorHandler_ = new SocketErrorHandler(self);
 
             // Connect to NEM Blockchain Websocket now
             self.nemConnection_ = self.nemsocket_.connectWS(function() {
@@ -293,7 +284,7 @@
                     self.connectBlockchainSocket();
                 }
 
-            }, websocketErrorHandler);
+            }, self.errorHandler_.handle);
 
             return self.nemsocket_;
         };
@@ -319,6 +310,11 @@
                 self.nemsocket_.disconnectWS(function() {
                     self.logger().info("[NEM] [PAY-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
 
+                    delete self.nemsocket_;
+                    delete self.nemSubscriptions_;
+                    delete self.nemConnection_;
+                    self.nemSubscriptions_ = {};
+
                     if (callback)
                         return callback();
                 });
@@ -327,6 +323,9 @@
                 self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket Hot Disconnect.");
 
                 delete self.nemsocket_;
+                delete self.nemSubscriptions_;
+                delete self.nemConnection_;
+                self.nemSubscriptions_ = {};
                 return callback();
             }
         };

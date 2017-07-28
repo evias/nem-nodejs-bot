@@ -19,6 +19,7 @@
 
     var nemAPI = require("nem-api");
     var BlocksAuditor = require("./blocks-auditor.js").BlocksAuditor;
+    var SocketErrorHandler = require("./socket-error-handler.js").SocketErrorHandler;
 
     /**
      * class MultisigCosignatory implements an example of multi signature
@@ -50,6 +51,7 @@
         this.nemSubscriptions_ = {};
 
         this.auditor_ = null;
+        this.errorHandler_ = null;
         this.moduleName = "sign-socket";
         this.logLabel = "SIGN-SOCKET";
 
@@ -65,6 +67,14 @@
             return this.blockchain_.conf_;
         };
 
+        this.getAuditor = function() {
+            return this.auditor_;
+        };
+
+        this.getErrorHandler = function() {
+            return this.errorHandler_;
+        };
+
         // define a helper function to automatically sign incoming unconfirmed transactions
         // with the NEMBot's cosignatory wallet private key. The more cosignatory bots, the more
         // security is increased as it will be hard for a hacker to disclose all bots. Plus the
@@ -77,6 +87,7 @@
             instance.db_.NEMSignedTransaction.findOne({ transactionHash: trxHash }, function(err, signedTrx) {
                 if (!err && signedTrx) {
                     // transaction already signed
+                    //instance.logger().info("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Transaction already signed: " + trxHash);
                     return false;
                 } else if (err) {
                     instance.logger().info("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Database Error with NEMSignedTransaction: " + err);
@@ -143,6 +154,8 @@
         var websocketFallbackHandler = function(instance) {
             // XXX should also check the Block Height and Last Block to know whether there CAN be new data.
 
+            instance.logger().info("[NEM] [SIGN-FALLBACK] [TRY] ", __line, "Checking unconfirmed transactions of " + instance.blockchain_.getBotSignMultisigWallet() + ".");
+
             // read the payment channel recipient's incoming transaction to check whether the Websocket
             // has missed any (happens maybe only on testnet, but this is for being sure.). The same event
             // will be emitted in case a transaction is found un-forwarded.
@@ -150,21 +163,22 @@
                 .requests.account.transactions
                 .unconfirmed(instance.blockchain_.endpoint(), instance.blockchain_.getBotSignMultisigWallet())
                 .then(function(res) {
+
                     var unconfirmed = res.data;
 
-                    instance.logger().info("[NEM] [SIGN-FALLBACK] [TRY] ", __line, "will now try to sign " + unconfirmed.length + " transactions with " + instance.blockchain_.getBotSignWallet() + " for " + instance.blockchain_.getBotSignMultisigWallet() + ".");
+                    instance.logger().info("[NEM] [SIGN-FALLBACK] [TRY] ", __line, "Will now try to sign " + unconfirmed.length + " transactions with " + instance.blockchain_.getBotSignWallet() + " for " + instance.blockchain_.getBotSignMultisigWallet() + ".");
 
                     for (var i in unconfirmed) {
                         var transaction = unconfirmed[i];
+
                         var meta = transaction.meta;
                         var content = transaction.transaction;
-                        var trxHash = instance.blockchain_.getTransactionHash(transaction);
 
                         //XXX implement real verification of transaction type. In case it is a multisig
                         //    it should always check the transaction.otherTrans.type value.
                         //XXX currently only multisig transaction can be signed with this bot.
 
-                        if (transaction.type != chainDataLayer.nem().model.transactionTypes.multisigTransaction) {
+                        if (content.type != instance.blockchain_.nem().model.transactionTypes.multisigTransaction) {
                             // we are interested only in multisig transactions.
                             continue;
                         }
@@ -189,23 +203,7 @@
             // blockchain instance connected endpoint
             self.nemsocket_ = new api_(self.blockchain_.getNetwork().host + ":" + self.blockchain_.getNetwork().port);
 
-            // define helper for websocket error handling. The NEM Blockchain Socket
-            // should be alive as long as the bot is running so we will always try
-            // to reconnect, unless the bot has been stopped from running or has crashed.
-            var websocketErrorHandler = function(error) {
-                var regexp_LostConn = new RegExp(/Lost connection to/);
-                if (regexp_LostConn.test(error)) {
-                    // connection lost, re-connect
-
-                    self.logger().warn("[NEM] [SIGN-SOCKET] [DROP]", __line, "Connection lost with node: " + JSON.stringify(self.nemsocket_.socketpt) + ".. Now re-connecting.");
-                    self.connectBlockchainSocket();
-                    return true;
-                }
-                //XXX ECONNREFUSED => switch node
-
-                // uncaught error happened
-                self.logger().error("[NEM] [SIGN-SOCKET] [ERROR]", __line, "Uncaught Error: " + error);
-            };
+            self.errorHandler_ = new SocketErrorHandler(self);
 
             // Connect to NEM Blockchain Websocket now
             self.nemConnection_ = self.nemsocket_.connectWS(function() {
@@ -253,7 +251,14 @@
                     self.logger().error("[NEM] [ERROR]", __line, "Websocket Subscription Error: " + e);
                     self.connectBlockchainSocket();
                 }
-            }, websocketErrorHandler);
+            }, self.errorHandler_.handle);
+
+            // fallback handler queries the blockchain every 2 minutes
+            var fallbackInterval = setInterval(function() {
+                websocketFallbackHandler(self);
+            }, 120 * 1000);
+
+            websocketFallbackHandler(self);
 
             return self.nemsocket_;
         };
@@ -279,6 +284,11 @@
                 self.nemsocket_.disconnectWS(function() {
                     self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket disconnected.");
 
+                    delete self.nemsocket_;
+                    delete self.nemSubscriptions_;
+                    delete self.nemConnection_;
+                    self.nemSubscriptions_ = {};
+
                     if (callback)
                         return callback();
                 });
@@ -287,6 +297,9 @@
                 self.logger().info("[NEM] [SIGN-SOCKET] [DISCONNECT]", __line, "Websocket Hot Disconnect.");
 
                 delete self.nemsocket_;
+                delete self.nemSubscriptions_;
+                delete self.nemConnection_;
+                self.nemSubscriptions_ = {};
                 return callback();
             }
         };
