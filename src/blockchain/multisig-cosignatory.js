@@ -94,6 +94,8 @@
                     return false;
                 }
 
+                instance.logger().info("[NEM] [SIGN] ", __line, "Will sign " + trxHash + " with " + instance.blockchain_.getBotSignWallet() + " for " + instance.blockchain_.getBotSignMultisigWallet() + ".");
+
                 // transaction not found in database, will now issue transaction co-signing
                 // in case this transaction does not exceed the daily maximum amount.
 
@@ -165,8 +167,6 @@
                 .then(function(res) {
 
                     var unconfirmed = res.data;
-
-                    instance.logger().info("[NEM] [SIGN-FALLBACK] [TRY] ", __line, "Will now try to sign " + unconfirmed.length + " transactions with " + instance.blockchain_.getBotSignWallet() + " for " + instance.blockchain_.getBotSignMultisigWallet() + ".");
 
                     for (var i in unconfirmed) {
                         var transaction = unconfirmed[i];
