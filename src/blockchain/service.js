@@ -264,8 +264,8 @@
             var meta = transactionMetaDataPair.meta;
             var content = transactionMetaDataPair.transaction;
 
-            var trxHash = meta.hash.data;
-            if (inner === true && meta.innerHash.data && meta.innerHash.data.length)
+            var trxHash = meta.hash ? meta.hash.data : meta.data;
+            if (inner === true && meta.innerHash && meta.innerHash.data && meta.innerHash.data.length)
                 trxHash = meta.innerHash.data;
 
             return trxHash;
