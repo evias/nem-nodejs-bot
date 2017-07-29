@@ -54,6 +54,7 @@
         this.errorHandler_ = null;
         this.moduleName = "sign-socket";
         this.logLabel = "SIGN-SOCKET";
+        this.fallback_ = null;
 
         this.options_ = {
             mandatoryMessage: true
@@ -186,7 +187,7 @@
                         automaticTransactionSigningHandler(instance, transaction);
                     }
                 }, function(err) {
-                    instance.logger().error("[NEM] [ERROR] [SIGN-FALLBACK]", __line, "NIS API account.transactions.unconfirmed Error: " + err);
+                    instance.logger().error("[NEM] [ERROR] [SIGN-FALLBACK]", __line, "NIS API account.transactions.unconfirmed Error: " + JSON.stringify(err));
                 });
         };
 
@@ -254,7 +255,8 @@
             }, self.errorHandler_.handle);
 
             // fallback handler queries the blockchain every 2 minutes
-            var fallbackInterval = setInterval(function() {
+            if (self.fallback_ !== null) clearInterval(self.fallback_);
+            self.fallback_ = setInterval(function() {
                 websocketFallbackHandler(self);
             }, 120 * 1000);
 
@@ -302,33 +304,6 @@
                 self.nemSubscriptions_ = {};
                 return callback();
             }
-        };
-
-        /**
-         * This method adds a new backend Socket to the current available Socket.IO
-         * client instances. This is used to forward payment status updates event
-         * back to the Backend which will then forward it to the Frontend Application
-         * or Game.
-         *
-         * This method also opens a FALLBACK HTTP/JSON NIS API handler to query the
-         * blockchain every minute for new transactions that might be relevant to our
-         * application or game.
-         *
-         * @param  {object} backendSocket
-         * @param  {NEMPaymentChannel} paymentChannel
-         * @param  {object} params
-         * @return {NEMPaymentChannel}
-         */
-        this.connectFallbackListener = function(params) {
-            var self = this;
-
-            // fallback handler queries the blockchain every 30 seconds
-            var fallbackInterval = setInterval(function() {
-                websocketFallbackHandler(self);
-            }, 30 * 1000);
-
-            // check payment state now - do not wait 30 seconds
-            websocketFallbackHandler(self);
         };
 
         /**
