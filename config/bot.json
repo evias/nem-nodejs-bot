@@ -52,8 +52,8 @@
             { "host": "http://123.56.253.121", "port": 7890 }
         ],
         "nodes_test": [
-            { "host": "http://104.128.226.60", "port": 7890 },
             { "host": "http://50.3.87.123", "port": 7890 },
+            { "host": "http://104.128.226.60", "port": 7890 },
             { "host": "http://bigalice2.nem.ninja", "port": 7890 },
             { "host": "http://150.95.145.157", "port": 7890 },
             { "host": "http://188.68.50.161", "port": 7890 },
