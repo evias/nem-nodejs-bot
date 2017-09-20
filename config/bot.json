@@ -14,7 +14,7 @@
                     "72117b4254b9e49cdfbaa6b7c1825f002cdd55c838ca78485291dca9834ec176"
                 ],
                 "walletAddress": "TBRA6PUMPOFLGJ27ZM5XY2FSO4ZN2HIZBARU47UQ",
-                "privateKey": "794ce5e516813d1df7e819f901c0c14bb40d5104a5d979700f92b2078d91c12d"
+                "privateKey": "Insert private key for Signer Bot"
             },
             "dailyMaxAmount": 0,
             "onlyTransfers": true
@@ -52,9 +52,9 @@
             { "host": "http://123.56.253.121", "port": 7890 }
         ],
         "nodes_test": [
+            { "host": "http://104.128.226.60", "port": 7890 },
             { "host": "http://50.3.87.123", "port": 7890 },
             { "host": "http://bigalice2.nem.ninja", "port": 7890 },
-            { "host": "http://104.128.226.60", "port": 7890 },
             { "host": "http://150.95.145.157", "port": 7890 },
             { "host": "http://188.68.50.161", "port": 7890 },
             { "host": "http://37.120.188.83", "port": 7890 },
