@@ -1,29 +1,28 @@
 nem-nodejs-bot: Node.js Bot for the NEM blockchain
 ==================================================
 
-This is a multi feature Bot written in Node.js for the NEM blockchain. This bot can be deployed to Heroku free tiers
-or serving locally.
+This is a multi-feature bot written in Node.js for the NEM blockchain. It can be deployed to Heroku free tiers or served locally.
 
-Main features of this bot include **listening** to account **transactions** income or account data modifications and **cosigning**
+The main features of this bot include **listening** to incoming account **transactions** or account data modifications and **co-signing**
 multi signature accounts **transactions**.
 
+Overview
+--------
+
 The **NEMBot** aims to be hidden such that Websites using the Bot for *payment processing*, never **directly** communicate with the Bot.
-This helps secure the Signing features but also gives more Privacy to any company using the NEMBot for their Payment Processor (example of
+This helps securing the signing features and gives more privacy to any company using the NEMBot for their payment processor (e.g.
 NEMPay).
 
-Socket.io is used to Proxy the Communication between the NEMBot and your Node.js express app. This is to avoid addressing
-your NEMBot over HTTP or Websocket **directly**(traceable in the Network Console). I decided to implement a Proxying mechanism
-using Socket.io that will be placed between the Frontend and the Bot such that **even reading** is kept private.
+Socket.io is used to proxy the communication between the NEMBot and your Node.js express app. This is to avoid addressing
+your NEMBot over HTTP or Websocket **directly** (which is traceable in the network console). I decided to implement a proxying mechanism
+using Socket.io that will be placed between the Frontend and the bot, so **even reading is kept private**.
 
-The multisignature co-signing features do not use any other **communications** protocol than the **Blockchain** itself! This is
-possible with the *Multi Signature Account Push Notification System* right in the NEM blockchain core. Communicating only through
-the NEM Blockchain is a security feature that will help not disclose locations of the NEMBot(s) used for co-signing.
+The multisignature co-signing features do not use any other **communication** protocol than the **NEM Blockchain** itself! This is
+made possible by using the *Multi Signature Account Push Notification System* which is part of the NEM blockchain core functionalities. Communicating only through the NEM Blockchain is a security feature that avoids disclosing locations of the NEMBot(s) used for co-signing.
 
-The NEMBot also provides a HTTP/JSON API for which the endpoints will be listed in this document. The HTTP/JSON API should only
-provide with a READ API such that the database of the NEMBot(s) can be read. **In the current state of development, however,
-there is a /api/v1/reset API endpoint to RESET the NEMBot data**. Please be aware of this if you decide to use the NEMBot already.
+The NEMBot also provides a HTTP/JSON API for which the endpoints will be listed in this document. The HTTP/JSON API should onlyn provide with a READ API such that the database of the NEMBot(s) can be read. **In the current state of development, however, there is an /api/v1/reset API endpoint to RESET the NEMBot data**. Please be aware of this if you decide to use the NEMBot already.
 
-This bot can secure your application in a new way as you can deploy **any count** of NEMBots to **co-sign** your multisig accounts
+This bot can secure your application in a new way as you can deploy **any count** of NEMBot instances to **co-sign** your multisig accounts
 transactions. This way you can configure a secure multisig infrastructure and let the NEMBot handle co-signing automatically.
 
 Dependencies
