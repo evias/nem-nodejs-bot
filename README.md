@@ -4,26 +4,23 @@ nem-nodejs-bot: Node.js Bot for the NEM blockchain
 This is a multi-feature bot written in Node.js for the NEM blockchain. It can be deployed to Heroku free tiers or served locally.
 
 The main features of this bot include **listening** to incoming account **transactions** or account data modifications and **co-signing**
-multi signature accounts **transactions**.
+multi-signature accounts **transactions**.
 
 Overview
 --------
 
-The **NEMBot** aims to be hidden such that Websites using the Bot for *payment processing*, never **directly** communicate with the Bot.
+The **NEMBot** aims to be hidden such that Websites using the Bot for *payment processing*, never **directly** communicate with the bot.
 This helps securing the signing features and gives more privacy to any company using the NEMBot for their payment processor (e.g.
 NEMPay).
 
 Socket.io is used to proxy the communication between the NEMBot and your Node.js express app. This is to avoid addressing
-your NEMBot over HTTP or Websocket **directly** (which is traceable in the network console). I decided to implement a proxying mechanism
-using Socket.io that will be placed between the Frontend and the bot, so **even reading is kept private**.
+your NEMBot instance over HTTP or Websocket **directly** (which is traceable in the network console). I decided to implement a proxying mechanism using Socket.io that is placed between the frontend and the bot, so **even reading is kept private**.
 
-The multisignature co-signing features do not use any other **communication** protocol than the **NEM Blockchain** itself! This is
-made possible by using the *Multi Signature Account Push Notification System* which is part of the NEM blockchain core functionalities. Communicating only through the NEM Blockchain is a security feature that avoids disclosing locations of the NEMBot(s) used for co-signing.
+The multisignature co-signing features do not use any other **communication** protocol than the **NEM Blockchain** itself! This is possible by using the *Multi Signature Account Push Notification System* which is part of the NEM blockchain core. Communicating only through the NEM Blockchain is a security feature that avoids disclosing locations of the NEMBot instance(s) used for co-signing.
 
-The NEMBot also provides a HTTP/JSON API for which the endpoints will be listed in this document. The HTTP/JSON API should onlyn provide with a READ API such that the database of the NEMBot(s) can be read. **In the current state of development, however, there is an /api/v1/reset API endpoint to RESET the NEMBot data**. Please be aware of this if you decide to use the NEMBot already.
+The NEMBot also provides a HTTP/JSON API for which the endpoints will be listed in this document. The HTTP/JSON API should only provide a READ API such that the database of the NEMBot(s) can be read. **In the current state of development, however, there is an /api/v1/reset API endpoint to RESET the NEMBot data**. Please be aware of this if you decide to use the NEMBot already.
 
-This bot can secure your application in a new way as you can deploy **any count** of NEMBot instances to **co-sign** your multisig accounts
-transactions. This way you can configure a secure multisig infrastructure and let the NEMBot handle co-signing automatically.
+This bot can secure your application in a new way as you deploy **any amount** of NEMBot instances to **co-sign** your multi-sig account's transactions. This way you can configure a secure multi-sig infrastructure and let the NEMBot handle co-signing automatically.
 
 Example Flow
 ------------
@@ -32,8 +29,8 @@ In the following, an example flow is introduced which leverages both the **liste
 ![NEMBot Overview](overview.png)
 
 
-1. Alice signs `TX1` to send 3 XEM to `NPACNEM-..`, which is a multi-signature wallet
-2. `NPACNEM-..` receives `TX1` containing 3 XEM
+1. Alice signs `TX1` to send 3 XEM to `NPACNEM-..`, which is a multi-signature wallet
+2. `NPACNEM-..` receives `TX1` containing 3 XEM
 3. The responsible NIS Node notifies the init-bot (`NBOT-1`) about the payment through a web socket connection. 
 4. The init-bot is one of the accepted co-signatories who are allowed to initiate transaction on behalf of `NPACNEM-..`. It initiates `TX2` to send 1 PN-Mosaic to Alice in exchange for her payment.
 5. The responsible NIS Node notifies the cosign-bot (`NBOT-2`) about the pending co-sign transaction `TX2` through a web socket connection.
