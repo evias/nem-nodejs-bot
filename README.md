@@ -26,7 +26,7 @@ Example Flow
 ------------
 In the following, an example flow is introduced which leverages both the **listening** as well as the **co-signing** core features of NEMBot. In this scenario, Alice has the public key `NALICE-XY..` and wants to send 3 XEM to `NPACNEM-..` in order to receive 1 PN-Mosaic.
 
-![NEMBot Overview](overview.png)
+![NEMBot Overview](assets/overview.png)
 
 
 1. Alice signs `TX1` to send 3 XEM to `NPACNEM-..`, which is a multi-signature wallet
@@ -307,12 +307,29 @@ var startPaymentChannel = function(clientSocketId, callback)
 </script>
 ```
 
+Occasional Errors / Maintenance
+-------------------------------
+
+Let's first see an example of working unconfirmed transaction listening:
+
+![NEMBot Listening to Transactions](assets/unconfirmed_listening.png)
+
+When you activate the co-signature features of the Bot(s), you will see the following example log when *any* transaction is co-signed. Features for *interactive co-signing* have not yet been implemented.
+
+![NEMBot Transaction co-signing](assets/bot_cosignature.png)
+
+It will sometimes happen that your Bot(s) cannot connect to given NEM nodes. This may happen due to connectivity issues on side of the NEM nodes. 
+
+Following is an example of logging that happens when errors are being hit for a said node connection:
+
+![NEMBot Connection Issue](assets/node_connection_refused.png)
+
 Pot de vin
 ----------
 
 If you like the initiative, and for the sake of good mood, I recommend you take a few minutes to Donate a beer or Three [because belgians like that] by sending some XEM (or whatever Mosaic you think pays me a few beers someday!) to my Wallet:
 ```
-    NCK34K5LIXL4OMPDLVGPTWPZMGFTDRZQEBRS5Q2S
+    NB72EM6TTSX72O47T3GQFL345AB5WYKIDODKPPYW
 ```
 
 License
