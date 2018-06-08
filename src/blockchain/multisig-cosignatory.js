@@ -365,7 +365,7 @@
          */
         this.isAcceptedCosignatory = function(cosigPubKey) {
             var self = this;
-            var cosigs = self.config().bot.sign.cosignatory.acceptFrom;
+            var cosigs = process.env["BOT_SIGN_ACCEPT_FROM"] || self.config().bot.sign.cosignatory.acceptFrom;
 
             if (typeof cosigs == "string")
                 return cosigs === cosigPubKey;
