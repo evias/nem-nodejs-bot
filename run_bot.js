@@ -64,7 +64,7 @@ var startBot = function(pass)
 		// Only start the bot in case the file is found
 		// and can be decrypted.
 
-		var enc = fs.readFileSync("config/bot.json.enc", {encoding: "utf8"});
+		var enc = process.env["ENCRYPT_DATA"] || fs.readFileSync("config/bot.json.enc", {encoding: "utf8"});
 		var dec = sconf.decryptContent(enc, pass);
 
 		if (dec === undefined) {
