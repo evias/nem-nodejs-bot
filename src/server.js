@@ -64,9 +64,13 @@
                 // add Basic HTTP auth using nem-bot.htpasswd file
 
                 var basicAuth = auth.basic({
-                    realm: "This is a Highly Secured Area - Monkey at Work.",
-                    file: __dirname + "/../nem-bot.htpasswd"
-                });
+                    realm: "This is a Highly Secured Area - Monkey at Work."
+                    },(username, password, callback) => {  
+                    // Custom authentication 
+                    // Use callback(error) if you want to throw async error. 
+                    callback(username === process.env["HTTP_AUTH_USERNAME"] &&
+                             password === process.env["HTTP_AUTH_PASSWORD"]);
+                }); 
                 app.use(auth.connect(basicAuth));
             }
 
