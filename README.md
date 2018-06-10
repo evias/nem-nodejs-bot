@@ -136,6 +136,7 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
 ```
     - Required:
         - APP_ENV : Environment of your NEMBot. Can be either production or development.
+        - ENCRYPT_DATA : This is the encrypted data in the bot.json.enc file genetrated for the first time you run the bot in local.
         - ENCRYPT_PASS : Should contain the configuration file encryption password. (if not set, will ask in terminal)
         - PORT : Should contain the Port on which the Bot HTTP/JSON API & Websockets will be addressed.
 
@@ -145,6 +146,7 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
         - BOT_MULTISIG_WALLET : overwrite config.bot.sign.multisigAdress
         - BOT_SIGN_WALLET : overwrite config.bot.sign.cosignatory.walletAddress
         - BOT_SIGN_PKEY : overwrite config.bot.sign.cosignatory.privateKey
+        - BOT_SIGN_ACCEPT_FROM: overwrite config.bot.sign.cosignatory.acceptFrom
         - BOT_TIPPER_WALLET : overwrite config.bot.tipper.walletAddress
 
     - Optional :
@@ -152,6 +154,8 @@ to your Heroku instance and the Bot will run on the heroku tier. Before you depl
         - NEM_PORT : Mainnet default NEM node port. (7890)
         - NEM_HOST_TEST : Testnet default NEM node. (http://bob.nem.ninja)
         - NEM_PORT_TEST : Testnet default NEM node port. (7890)
+        - HTTP_AUTH_USERNAME : HTTP Authentication Username
+        - HTTP_AUTH_PASSWORD : HTTP Authentication Password
 ```
 
 HTTP Basic Authentication

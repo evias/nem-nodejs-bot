@@ -62,12 +62,23 @@
 
             if (config.bot.protectedAPI === true) {
                 // add Basic HTTP auth using nem-bot.htpasswd file
-
-                var basicAuth = auth.basic({
-                    realm: "This is a Highly Secured Area - Monkey at Work.",
-                    file: __dirname + "/../nem-bot.htpasswd"
-                });
-                app.use(auth.connect(basicAuth));
+                if (process.env["HTTP_AUTH_USERNAME"] || process.env["HTTP_AUTH_PASSWORD"]){
+                    var basicAuth = auth.basic({
+                        realm: "This is a Highly Secured Area - Monkey at Work.",
+                        },(username, password, callback) => {  
+                        // Custom authentication 
+                        // Use callback(error) if you want to throw async error. 
+                        callback(username === process.env["HTTP_AUTH_USERNAME"] &&
+                                password === process.env["HTTP_AUTH_PASSWORD"]);
+                    }); 
+                    app.use(auth.connect(basicAuth));
+                }else{
+                    var basicAuth = auth.basic({ 
+                        realm: "This is a Highly Secured Area - Monkey at Work.", 
+                        file: __dirname + "/../nem-bot.htpasswd" 
+                    });
+                    app.use(auth.connect(basicAuth));
+                }
             }
 
             var package = fs.readFileSync("package.json");
